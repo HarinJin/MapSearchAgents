@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>잠실 어린이 동반 반나절 코스 - 지도</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    #map {
+      flex: 1;
+      height: 100%;
+    }
+    .sidebar {
+      width: 360px;
+      height: 100%;
+      overflow-y: auto;
+      background: #f8f9fa;
+      border-left: 1px solid #ddd;
+    }
+    .sidebar-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+    }
+    .sidebar-header h1 {
+      font-size: 1.3rem;
+      margin-bottom: 4px;
+    }
+    .sidebar-header p {
+      font-size: 0.85rem;
+      opacity: 0.8;
+    }
+    .category {
+      padding: 12px 16px;
+      border-bottom: 1px solid #eee;
+    }
+    .category-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .place-item {
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+    }
+    .place-item:hover {
+      background: #e9ecef;
+      transform: translateX(4px);
+    }
+    .place-item.active {
+      border-left-color: #667eea;
+      background: #e9ecef;
+    }
+    .place-item .name {
+      font-weight: 500;
+      font-size: 0.95rem;
+      color: #333;
+    }
+    .place-item .meta {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 2px;
+    }
+    .place-item .link {
+      font-size: 0.75rem;
+      color: #667eea;
+      text-decoration: none;
+      margin-top: 4px;
+      display: inline-block;
+    }
+    .place-item .link:hover {
+      text-decoration: underline;
+    }
+    .legend {
+      padding: 12px 16px;
+      background: #fff;
+      border-top: 1px solid #eee;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot-play { background: #e74c3c; }
+    .dot-food { background: #f39c12; }
+    .dot-cafe { background: #27ae60; }
+
+    /* Custom marker styles */
+    .custom-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      border: 2px solid white;
+    }
+    .marker-play { background: #e74c3c; }
+    .marker-food { background: #f39c12; }
+    .marker-cafe { background: #27ae60; }
+
+    .leaflet-popup-content {
+      margin: 12px;
+    }
+    .popup-title {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .popup-category {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .popup-link {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .popup-link:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="map"></div>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h1>🎠 잠실 어린이 동반 반나절 코스</h1>
+        <p>장소를 클릭하면 지도에서 확인할 수 있습니다</p>
+      </div>
+
+      <div class="category">
+        <div class="category-title">🎡 여가 / 놀이</div>
+        <div id="places-play"></div>
+      </div>
+
+      <div class="category">
+        <div class="category-title">🍽️ 식사</div>
+        <div id="places-food"></div>
+      </div>
+
+      <div class="category">
+        <div class="category-title">☕ 카페 / 베이커리</div>
+        <div id="places-cafe"></div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><span class="legend-dot dot-play"></span> 여가/놀이</div>
+        <div class="legend-item"><span class="legend-dot dot-food"></span> 식사</div>
+        <div class="legend-item"><span class="legend-dot dot-cafe"></span> 카페</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 장소 데이터 (API 검색 결과 기반)
+    const places = {
+      play: [
+        { name: "롯데월드 아쿠아리움", lat: 37.51345035, lng: 127.10479858, dist: "404m", desc: "해양생물 관람", url: "http://place.map.kakao.com/25974806" },
+        { name: "롯데월드 어드벤처", lat: 37.51113060, lng: 127.09811980, dist: "305m", desc: "실내+야외 놀이공원", url: "http://place.map.kakao.com/27560699" },
+        { name: "챔피언더블랙벨트 롯데월드몰", lat: 37.51423958, lng: 127.10485963, dist: "422m", desc: "놀이교육", url: "http://place.map.kakao.com/30260730" },
+        { name: "플레이타임 롯데마트 잠실월드점", lat: 37.51167977, lng: 127.09646689, dist: "378m", desc: "키즈카페", url: "http://place.map.kakao.com/25706446" },
+        { name: "캘리클럽 홈플러스잠실점", lat: 37.51625135, lng: 127.10300625, dist: "408m", desc: "키즈카페", url: "http://place.map.kakao.com/309186562" }
+      ],
+      food: [
+        { name: "애슐리퀸즈 잠실롯데캐슬점", lat: 37.51455574, lng: 127.09976440, dist: "144m", desc: "뷔페", url: "http://place.map.kakao.com/21302210" },
+        { name: "아웃백스테이크하우스 롯데백화점잠실점", lat: 37.51175971, lng: 127.09786953, dist: "270m", desc: "스테이크", url: "http://place.map.kakao.com/1766053303" },
+        { name: "매드포갈릭 롯데시네마월드타워점", lat: 37.51398846, lng: 127.10456180, dist: "390m", desc: "이탈리안", url: "http://place.map.kakao.com/25972163" },
+        { name: "캐롤스", lat: 37.51320338, lng: 127.10388544, dist: "323m", desc: "패밀리레스토랑", url: "http://place.map.kakao.com/172624697" }
+      ],
+      cafe: [
+        { name: "런던베이글뮤지엄 잠실점", lat: 37.51337207, lng: 127.10365833, dist: "303m", desc: "베이커리카페", url: "http://place.map.kakao.com/1959865002" },
+        { name: "스타벅스 잠실역점", lat: 37.51526713, lng: 127.09916811, dist: "236m", desc: "커피", url: "http://place.map.kakao.com/11246062" },
+        { name: "뉴질랜드스토리", lat: 37.50969133, lng: 127.10584859, dist: "638m", desc: "석촌호수 뷰", url: "http://place.map.kakao.com/21404892" },
+        { name: "밀도 롯데백화점잠실점", lat: 37.51216269, lng: 127.09974764, dist: "134m", desc: "식빵 전문", url: "http://place.map.kakao.com/1087805899" }
+      ]
+    };
+
+    // 잠실역 중심 좌표
+    const jamsil = [37.513311, 127.100231];
+
+    // 지도 초기화
+    const map = L.map('map').setView(jamsil, 16);
+
+    // OpenStreetMap 타일 추가
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // 잠실역 마커
+    L.marker(jamsil, {
+      icon: L.divIcon({
+        className: 'custom-marker',
+        html: '<div style="background:#333;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;border:2px solid white;">🚇</div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    }).addTo(map).bindPopup('<b>잠실역</b><br>검색 중심점');
+
+    // 마커 저장용
+    const markers = {};
+
+    // 커스텀 마커 아이콘 생성
+    function createIcon(type, label) {
+      const colors = { play: '#e74c3c', food: '#f39c12', cafe: '#27ae60' };
+      return L.divIcon({
+        className: 'custom-marker',
+        html: `<div class="custom-marker" style="background:${colors[type]}">${label}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
+      });
+    }
+
+    // 팝업 컨텐츠 생성
+    function createPopup(place) {
+      return `
+        <div class="popup-title">${place.name}</div>
+        <div class="popup-category">${place.desc} · ${place.dist}</div>
+        <a href="${place.url}" target="_blank" class="popup-link">카카오맵에서 보기</a>
+      `;
+    }
+
+    // 사이드바 아이템 생성
+    function createPlaceItem(place, type, index, marker) {
+      const div = document.createElement('div');
+      div.className = 'place-item';
+      div.innerHTML = `
+        <div class="name">${place.name}</div>
+        <div class="meta">${place.desc} · ${place.dist}</div>
+        <a href="${place.url}" target="_blank" class="link" onclick="event.stopPropagation()">카카오맵에서 보기 →</a>
+      `;
+      div.addEventListener('click', () => {
+        // 모든 아이템 비활성화
+        document.querySelectorAll('.place-item').forEach(el => el.classList.remove('active'));
+        // 현재 아이템 활성화
+        div.classList.add('active');
+        // 지도 이동 및 팝업 열기
+        map.setView([place.lat, place.lng], 17);
+        marker.openPopup();
+      });
+      return div;
+    }
+
+    // 장소 렌더링
+    function renderPlaces(type, containerId) {
+      const container = document.getElementById(containerId);
+      places[type].forEach((place, index) => {
+        // 마커 추가
+        const marker = L.marker([place.lat, place.lng], {
+          icon: createIcon(type, index + 1)
+        }).addTo(map).bindPopup(createPopup(place));
+
+        markers[`${type}-${index}`] = marker;
+
+        // 사이드바 아이템 추가
+        container.appendChild(createPlaceItem(place, type, index, marker));
+      });
+    }
+
+    // 렌더링 실행
+    renderPlaces('play', 'places-play');
+    renderPlaces('food', 'places-food');
+    renderPlaces('cafe', 'places-cafe');
+
+    // 모든 마커가 보이도록 지도 범위 조정
+    const allCoords = [
+      ...places.play.map(p => [p.lat, p.lng]),
+      ...places.food.map(p => [p.lat, p.lng]),
+      ...places.cafe.map(p => [p.lat, p.lng])
+    ];
+    map.fitBounds(allCoords, { padding: [50, 50] });
+  </script>
+</body>
+</html>

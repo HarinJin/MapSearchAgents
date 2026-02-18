@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>끄라비 무에타이 체육관 - 지도</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+    .container {
+      display: grid;
+      grid-template-columns: 360px 1fr 340px;
+      height: 100vh;
+    }
+
+    /* ── Left Panel ── */
+    .left-panel {
+      height: 100%;
+      overflow-y: auto;
+      background: #FFFBF5;
+      border-right: 1px solid #E8DDD0;
+      scrollbar-width: thin;
+      scrollbar-color: #D4C5B0 transparent;
+    }
+    .left-panel::-webkit-scrollbar { width: 5px; }
+    .left-panel::-webkit-scrollbar-thumb { background: #D4C5B0; border-radius: 3px; }
+
+    .panel-header {
+      background: linear-gradient(135deg, #C2185B 0%, #E65100 50%, #F57C00 100%);
+      color: white;
+      padding: 20px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .panel-header h1 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .panel-header p { font-size: 0.75rem; opacity: 0.85; line-height: 1.4; }
+    .hotel-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255,255,255,0.2);
+      padding: 3px 8px;
+      border-radius: 16px;
+      font-size: 0.7rem;
+      margin-top: 6px;
+      backdrop-filter: blur(4px);
+    }
+
+    .section-label {
+      padding: 10px 16px 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9E8E7E;
+    }
+
+    .place-item {
+      padding: 12px 14px;
+      margin: 0 8px 6px;
+      background: white;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid #F0E6D8;
+    }
+    .place-item:hover {
+      border-color: #E65100;
+      box-shadow: 0 2px 10px rgba(230, 81, 0, 0.1);
+      transform: translateY(-1px);
+    }
+    .place-item.active {
+      border-color: #E65100;
+      background: #FFF8F0;
+      box-shadow: 0 2px 14px rgba(230, 81, 0, 0.15);
+    }
+
+    .place-header { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+    .place-rank {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #E65100;
+      color: white;
+      font-size: 0.65rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .place-name { font-weight: 600; font-size: 0.88rem; color: #2D1B0E; flex: 1; }
+    .place-distance-group {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      flex-shrink: 0;
+      margin-left: 4px;
+    }
+    .place-distance {
+      font-size: 0.65rem;
+      color: #E65100;
+      font-weight: 600;
+      background: #FFF3E0;
+      padding: 1px 6px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .place-route-info {
+      font-size: 0.6rem;
+      color: #7A6B5D;
+      white-space: nowrap;
+    }
+    .place-route-info.loading { color: #BDBDBD; }
+
+    .place-meta { font-size: 0.75rem; color: #7A6B5D; margin: 3px 0; padding-left: 26px; line-height: 1.5; }
+    .place-meta .price { color: #C2185B; font-weight: 600; }
+
+    .place-tags { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 26px; margin-top: 4px; }
+    .tag {
+      font-size: 0.6rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-weight: 500;
+    }
+    .tag-schedule { background: #E8F5E9; color: #2E7D32; }
+    .tag-closed { background: #FFEBEE; color: #C62828; }
+    .tag-feature { background: #E3F2FD; color: #1565C0; }
+    .tag-recommend { background: #FFF3E0; color: #E65100; }
+
+    .place-hours {
+      margin-top: 6px;
+      padding: 6px 10px;
+      margin-left: 26px;
+      background: #FAFAF6;
+      border-radius: 6px;
+      font-size: 0.68rem;
+      color: #7A6B5D;
+      line-height: 1.6;
+      display: none;
+    }
+    .place-item.active .place-hours { display: block; }
+
+    .place-links {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+      padding-left: 26px;
+    }
+    .place-link {
+      font-size: 0.65rem;
+      color: #E65100;
+      text-decoration: none;
+      padding: 3px 8px;
+      border: 1px solid #FFCCBC;
+      border-radius: 5px;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .place-link:hover { background: #FFF3E0; border-color: #E65100; }
+
+    /* ── Center Map ── */
+    #map { height: 100%; }
+
+    /* ── Right Panel ── */
+    .right-panel {
+      height: 100%;
+      overflow-y: auto;
+      background: #FFF9F2;
+      border-left: 1px solid #E8DDD0;
+      scrollbar-width: thin;
+      scrollbar-color: #D4C5B0 transparent;
+    }
+    .right-panel::-webkit-scrollbar { width: 5px; }
+    .right-panel::-webkit-scrollbar-thumb { background: #D4C5B0; border-radius: 3px; }
+
+    .right-header {
+      background: linear-gradient(135deg, #4A148C 0%, #6A1B9A 50%, #8E24AA 100%);
+      color: white;
+      padding: 20px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .right-header h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .right-header p { font-size: 0.72rem; opacity: 0.85; }
+
+    .plan-section {
+      margin: 12px;
+      padding: 14px;
+      background: white;
+      border-radius: 10px;
+      border: 1px solid #F0E6D8;
+    }
+    .plan-section h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .plan-section h3 .day-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: white;
+    }
+    .day1-badge { background: #C2185B; }
+    .day2-badge { background: #4A148C; }
+
+    .plan-step {
+      display: flex;
+      gap: 10px;
+      padding: 8px 0;
+      position: relative;
+    }
+    .plan-step + .plan-step { border-top: 1px dashed #F0E6D8; }
+
+    .step-time {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #9E8E7E;
+      min-width: 36px;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+    .step-content { flex: 1; }
+    .step-name { font-size: 0.8rem; font-weight: 600; color: #2D1B0E; margin-bottom: 2px; }
+    .step-detail { font-size: 0.7rem; color: #7A6B5D; line-height: 1.5; }
+    .step-price { font-size: 0.7rem; color: #C2185B; font-weight: 600; }
+
+    .step-route-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 0 2px;
+      font-size: 0.65rem;
+      color: #9E8E7E;
+    }
+    .step-route-badge svg { flex-shrink: 0; }
+
+    .plan-tip {
+      margin: 0 12px 12px;
+      padding: 12px;
+      background: linear-gradient(135deg, #F3E5F5, #EDE7F6);
+      border-radius: 10px;
+      border: 1px solid #CE93D8;
+    }
+    .plan-tip h4 { font-size: 0.75rem; color: #6A1B9A; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+    .plan-tip p { font-size: 0.7rem; color: #4A148C; line-height: 1.5; }
+    .plan-tip ul { font-size: 0.7rem; color: #4A148C; line-height: 1.8; padding-left: 16px; }
+
+    .comparison-table {
+      margin: 0 12px 12px;
+      background: white;
+      border-radius: 10px;
+      border: 1px solid #F0E6D8;
+      overflow: hidden;
+    }
+    .comparison-table h3 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 12px 14px 8px;
+      color: #2D1B0E;
+    }
+    .comparison-table table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.68rem;
+    }
+    .comparison-table th {
+      text-align: left;
+      padding: 5px 10px;
+      color: #9E8E7E;
+      font-weight: 600;
+      border-bottom: 1px solid #F0E6D8;
+      background: #FAFAF6;
+    }
+    .comparison-table td {
+      padding: 5px 10px;
+      color: #5D4037;
+      border-bottom: 1px solid #F5F0E8;
+    }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .comparison-table .highlight { background: #FFF8F0; }
+
+    .disclaimer {
+      margin: 8px 12px 16px;
+      padding: 10px 12px;
+      background: #FFF8E1;
+      border-radius: 8px;
+      font-size: 0.68rem;
+      color: #F57F17;
+      line-height: 1.5;
+      border-left: 3px solid #FFD54F;
+    }
+
+    /* ── Route toggle ── */
+    .route-toggle {
+      display: flex;
+      gap: 4px;
+      padding: 8px 16px;
+      background: #FAFAF6;
+      border-bottom: 1px solid #F0E6D8;
+    }
+    .route-toggle button {
+      flex: 1;
+      padding: 5px 0;
+      font-size: 0.68rem;
+      font-weight: 600;
+      font-family: inherit;
+      border: 1px solid #E8DDD0;
+      border-radius: 6px;
+      background: white;
+      color: #7A6B5D;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .route-toggle button.active {
+      background: #E65100;
+      color: white;
+      border-color: #E65100;
+    }
+    .route-toggle button:hover:not(.active) {
+      border-color: #E65100;
+      color: #E65100;
+    }
+
+    /* ── Markers ── */
+    .marker-hotel {
+      background: #1565C0;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 16px;
+      box-shadow: 0 3px 12px rgba(21, 101, 192, 0.4);
+      border: 3px solid white;
+    }
+    .marker-gym {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-size: 12px; font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      border: 2px solid white;
+      transition: transform 0.2s;
+    }
+    .marker-gym.selected { transform: scale(1.4); z-index: 1000 !important; }
+    .marker-near { background: #E65100; }
+    .marker-mid { background: #F57C00; }
+    .marker-far { background: #9E9E9E; }
+
+    .leaflet-popup-content { margin: 12px 14px; max-width: 240px; }
+    .popup-name { font-weight: 700; font-size: 0.95rem; color: #2D1B0E; margin-bottom: 3px; }
+    .popup-detail { font-size: 0.75rem; color: #7A6B5D; margin-bottom: 2px; }
+    .popup-price { font-size: 0.8rem; color: #C2185B; font-weight: 600; margin: 4px 0; }
+    .popup-link {
+      display: inline-block;
+      background: linear-gradient(135deg, #C2185B, #E65100);
+      color: white;
+      padding: 5px 12px;
+      border-radius: 5px;
+      text-decoration: none;
+      font-size: 0.75rem;
+      margin-top: 4px;
+      transition: opacity 0.15s;
+    }
+    .popup-link:hover { opacity: 0.85; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1100px) {
+      .container {
+        grid-template-columns: 1fr;
+        grid-template-rows: 50vh auto auto;
+      }
+      .left-panel { order: 2; height: auto; max-height: 50vh; }
+      #map { order: 1; }
+      .right-panel { order: 3; height: auto; max-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Left Panel: Places -->
+    <div class="left-panel">
+      <div class="panel-header">
+        <h1>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          끄라비 무에타이 체육관
+        </h1>
+        <p>숙소 기준 거리순 / 1일 체험 가능</p>
+        <div class="hotel-badge">
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h.01M6 15h.01M10 11h.01M10 15h.01M14 11h.01M14 15h.01M18 11h.01M18 15h.01M6 7V3h12v4"/></svg>
+          DEEVANA PLAZA Krabi Aonang
+        </div>
+      </div>
+
+      <div class="route-toggle" role="radiogroup" aria-label="경로 표시 방식">
+        <button id="btn-all" class="active" onclick="showAllRoutes()">전체 경로</button>
+        <button id="btn-selected" onclick="showSelectedRoute()">선택 경로만</button>
+        <button id="btn-none" onclick="hideAllRoutes()">경로 숨기기</button>
+      </div>
+
+      <div class="section-label">아오낭 지역 (숙소 근처)</div>
+      <div id="places-near"></div>
+
+      <div class="section-label">주변 지역</div>
+      <div id="places-mid"></div>
+
+      <div class="section-label">끄라비 타운 (먼 거리)</div>
+      <div id="places-far"></div>
+
+      <div class="disclaimer">
+        해외 장소 정보는 실제와 다를 수 있습니다. 가격과 영업시간은 방문 전 각 체육관 웹사이트에서 최신 정보를 확인하세요.
+      </div>
+    </div>
+
+    <!-- Center: Map -->
+    <div id="map"></div>
+
+    <!-- Right Panel: Plan -->
+    <div class="right-panel">
+      <div class="right-header">
+        <h2>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          1~2일 체험 추천 계획
+        </h2>
+        <p>무에타이 체험 일정 가이드</p>
+      </div>
+
+      <!-- Day 1 -->
+      <div class="plan-section">
+        <h3><span class="day-badge day1-badge">DAY 1</span> 입문 체험</h3>
+        <div class="plan-step">
+          <div class="step-time">오전</div>
+          <div class="step-content">
+            <div class="step-name">Knockout 또는 Krulek</div>
+            <div class="step-detail">숙소에서 가까운 체육관에서 첫 체험</div>
+            <div class="step-detail">기초 기술: 핸드랩, 잽, 킥 기본자세</div>
+            <div class="step-price">400 THB</div>
+          </div>
+        </div>
+        <div class="step-route-badge">
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#9E8E7E" stroke-width="2"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>
+          숙소로 복귀 (휴식)
+        </div>
+        <div class="plan-step">
+          <div class="step-time">오후</div>
+          <div class="step-content">
+            <div class="step-name">자유 시간</div>
+            <div class="step-detail">아오낭 비치, 라일레이 비치 관광</div>
+            <div class="step-detail">저녁: 아오낭 나이트마켓 식사</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Day 2 -->
+      <div class="plan-section">
+        <h3><span class="day-badge day2-badge">DAY 2</span> 심화 체험 + 경기 관람</h3>
+        <div class="plan-step">
+          <div class="step-time">오전</div>
+          <div class="step-content">
+            <div class="step-name">Bull Muay Thai</div>
+            <div class="step-detail">리조트형 캠프에서 2시간 풀 세션</div>
+            <div class="step-detail">패드워크 + 스파링 기초</div>
+            <div class="step-price">500 THB</div>
+          </div>
+        </div>
+        <div class="step-route-badge">
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#9E8E7E" stroke-width="2"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>
+          Bull 리조트 풀에서 휴식 가능
+        </div>
+        <div class="plan-step">
+          <div class="step-time">저녁</div>
+          <div class="step-content">
+            <div class="step-name">무에타이 경기 관람</div>
+            <div class="step-detail">아오낭 복싱 스타디움</div>
+            <div class="step-detail">또는 Honour 멤버 무료 관람 (Theprasit)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comparison -->
+      <div class="comparison-table">
+        <h3>체육관 비교</h3>
+        <table>
+          <thead>
+            <tr><th>체육관</th><th>가격</th><th>시간</th><th>휴무</th></tr>
+          </thead>
+          <tbody>
+            <tr class="highlight"><td>Knockout</td><td>400</td><td>1.5h</td><td>월</td></tr>
+            <tr class="highlight"><td>Krulek</td><td>400</td><td>1.5h</td><td>일</td></tr>
+            <tr><td>Bull</td><td>500</td><td>2h</td><td>없음</td></tr>
+            <tr><td>Honour</td><td>450</td><td>-</td><td>일</td></tr>
+            <tr><td>Lion</td><td>?</td><td>-</td><td>없음</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Tips -->
+      <div class="plan-tip">
+        <h4>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#6A1B9A" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          체험 팁
+        </h4>
+        <ul>
+          <li>운동복, 수건, 물만 챙기면 OK</li>
+          <li>글러브/핸드랩은 대부분 대여 가능</li>
+          <li>오전 세션이 덜 더움 (추천)</li>
+          <li>Grab 앱으로 이동하면 가장 편리</li>
+          <li>세션 후 넉넉히 수분 보충</li>
+        </ul>
+      </div>
+
+      <div class="plan-tip">
+        <h4>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#6A1B9A" stroke-width="2"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          예상 비용 (2일)
+        </h4>
+        <ul>
+          <li>훈련 2회: 400 + 500 = <strong>900 THB</strong></li>
+          <li>이동 (Grab x4): ~<strong>400 THB</strong></li>
+          <li>경기 관람: ~<strong>1,000~1,500 THB</strong></li>
+          <li>합계: 약 <strong>2,300~2,800 THB</strong> (~92,000~112,000원)</li>
+        </ul>
+      </div>
+
+      <div class="disclaimer">
+        가격은 2025~2026 기준 추정치이며 변동될 수 있습니다.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const hotel = { name: 'DEEVANA PLAZA Krabi Aonang', lat: 8.0421284, lng: 98.8178887 };
+
+    const gyms = [
+      {
+        id: 1, name: 'Knockout Muay Thai Gym',
+        lat: 8.0387121, lng: 98.833235, dist: '~1.7km',
+        price: '400 THB/회', priceNote: '예약 불필요, 워크인 OK',
+        schedule: '오전 9:30-11:00 / 오후 5:00-6:30',
+        closed: '월요일 휴무',
+        hours: '화~토 9:00-20:00 | 일 9:00-19:00 | 월 휴무',
+        features: ['워크인 OK', '글러브 대여', '호스텔 운영'],
+        desc: '가장 가까운 체육관. 예약 없이 가면 됨. 개인별 자세 교정까지 해주는 친절한 트레이너.',
+        url: 'https://knockoutmuaythaikrabi.com/',
+        gmaps: 'https://www.google.com/maps/place/?q=place_id:ChIJ5WEvKyWVUTARFh_jj8SHAn4',
+        zone: 'near'
+      },
+      {
+        id: 2, name: 'Krulek Muaythai',
+        lat: 8.0374249, lng: 98.8345504, dist: '~1.9km',
+        price: '400 THB/회', priceNote: '드롭인 환영',
+        schedule: '오전 9:00-10:30 / 오후 5:00-6:30',
+        closed: '일요일 휴무',
+        hours: '월~토 9:00-19:00 | 일 휴무',
+        features: ['100전+ 파이터 지도', '장비 제공', '비치 도보 9분'],
+        desc: '실전 경력 100전 이상의 프로 파이터가 직접 지도. 8가지 무기 기술(주먹/팔꿈치/무릎/발) 훈련.',
+        url: 'https://krulekmuaythai.com',
+        gmaps: 'https://www.google.com/maps/place/?q=place_id:ChIJ8Sy3FTTBUTAR873fzQfElGM',
+        zone: 'near'
+      },
+      {
+        id: 3, name: 'Bull Muay Thai',
+        lat: 8.0466498, lng: 98.8472333, dist: '~3.3km',
+        price: '500 THB/회 (2시간)', priceNote: '프라이빗 990 THB',
+        schedule: '오전 8:30-10:30 / 오후 4:00-6:00',
+        closed: '연중무휴',
+        hours: '매일 8:30-18:30',
+        features: ['연중무휴', '풀 리조트', 'TripAdvisor 최고'],
+        desc: '리조트형 캠프. Bamboo Pool Resort 병설. 시설 최상급. 초보~프로 맞춤 2시간 세션.',
+        url: 'https://bullmuaythaikrabi.com/',
+        gmaps: 'https://www.google.com/maps/place/?q=place_id:ChIJzZWC1lGVUTARy3r4cAcBsRM',
+        zone: 'mid'
+      },
+      {
+        id: 4, name: 'Honour Muay Thai',
+        lat: 8.0452623, lng: 98.8521809, dist: '~3.8km',
+        price: '450 THB/회', priceNote: '프라이빗 800 THB',
+        schedule: '하루 2회 (월~토)',
+        closed: '일요일 휴무',
+        hours: '월~토 8:00-19:00 | 일 휴무',
+        features: ['경기 무료 관람', '홈쿡 식사', '카르스트 절경'],
+        desc: '석회암 카르스트 절경 속 훈련. Theprasit 스타디움 무에타이 경기 무료 관람 특전.',
+        url: 'https://honourmuaythai.com/',
+        gmaps: 'https://www.google.com/maps/place/?q=place_id:ChIJZSYkldeVAjER4ni5-WYwPmg',
+        zone: 'mid'
+      },
+      {
+        id: 5, name: 'Krabi Lion Muaythai',
+        lat: 8.031096, lng: 98.855529, dist: '~4.3km',
+        price: '미확인', priceNote: '',
+        schedule: '하루 2회',
+        closed: '연중무휴',
+        hours: '매일 8:00-20:00',
+        features: ['연중무휴'],
+        desc: '매일 운영되는 체육관. 가격 정보는 현장 확인 필요.',
+        url: '',
+        gmaps: 'https://www.google.com/maps/place/?q=place_id:ChIJn07LU4frUTAR5wOcoiYm3QY',
+        zone: 'mid'
+      },
+      {
+        id: 6, name: 'KMAX Muaythai Gym',
+        lat: 8.0774097, lng: 98.9103644, dist: '~10.9km',
+        price: '미확인', priceNote: '',
+        schedule: '하루 2회',
+        closed: '금요일 휴무',
+        hours: '월~목,토~일 8:30-21:00 | 금 휴무',
+        features: [],
+        desc: '끄라비 타운 소재. 숙소에서 먼 편이라 아오낭 체육관을 추천.',
+        url: '',
+        gmaps: 'https://www.google.com/maps/place/?q=place_id:ChIJodLEq4mUUTARyVBIEvAWdtI',
+        zone: 'far'
+      }
+    ];
+
+    // ── Map ──
+    const map = L.map('map').setView([hotel.lat, hotel.lng], 14);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Hotel marker
+    L.marker([hotel.lat, hotel.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div class="marker-hotel"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h.01M6 15h.01M10 11h.01M10 15h.01M14 11h.01M14 15h.01M18 11h.01M18 15h.01M6 7V3h12v4"/></svg></div>',
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18]
+      }),
+      zIndexOffset: 1000
+    }).addTo(map).bindPopup('<div class="popup-name">DEEVANA PLAZA Krabi Aonang</div><div class="popup-detail">숙소 (검색 기준점)</div>');
+
+    // ── Routes (OSRM) ──
+    const routeLayers = {};
+    const routeData = {};
+    let routeMode = 'all'; // 'all' | 'selected' | 'none'
+
+    const ROUTE_COLORS = {
+      near: '#E65100',
+      mid: '#F57C00',
+      far: '#9E9E9E'
+    };
+
+    async function fetchRoute(gym) {
+      const url = `https://router.project-osrm.org/route/v1/driving/${hotel.lng},${hotel.lat};${gym.lng},${gym.lat}?overview=full&geometries=geojson`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes.length > 0) {
+          const route = data.routes[0];
+          const distKm = (route.distance / 1000).toFixed(1);
+          const durMin = Math.round(route.duration / 60);
+          const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+          return { distKm, durMin, coords };
+        }
+      } catch (e) {
+        console.warn(`Route fetch failed for ${gym.name}:`, e);
+      }
+      return null;
+    }
+
+    function drawRoute(gym, coords) {
+      const color = ROUTE_COLORS[gym.zone] || '#9E9E9E';
+      const layer = L.polyline(coords, {
+        color: color,
+        weight: 3,
+        opacity: 0.6,
+        dashArray: null,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+      routeLayers[gym.id] = layer;
+
+      if (routeMode === 'none') {
+        layer.setStyle({ opacity: 0 });
+      } else if (routeMode === 'selected' && gym.id !== selectedId) {
+        layer.setStyle({ opacity: 0 });
+      }
+    }
+
+    function updateRouteVisibility() {
+      Object.keys(routeLayers).forEach(id => {
+        const numId = parseInt(id);
+        const layer = routeLayers[numId];
+        if (!layer) return;
+
+        if (routeMode === 'all') {
+          layer.setStyle({ opacity: 0.5, weight: 3 });
+          if (numId === selectedId) {
+            layer.setStyle({ opacity: 0.85, weight: 4 });
+            layer.bringToFront();
+          }
+        } else if (routeMode === 'selected') {
+          if (numId === selectedId) {
+            layer.setStyle({ opacity: 0.85, weight: 4 });
+            layer.bringToFront();
+          } else {
+            layer.setStyle({ opacity: 0 });
+          }
+        } else {
+          layer.setStyle({ opacity: 0 });
+        }
+      });
+    }
+
+    function setRouteMode(mode) {
+      routeMode = mode;
+      document.querySelectorAll('.route-toggle button').forEach(b => b.classList.remove('active'));
+      document.getElementById(`btn-${mode === 'all' ? 'all' : mode === 'selected' ? 'selected' : 'none'}`).classList.add('active');
+      updateRouteVisibility();
+    }
+    function showAllRoutes() { setRouteMode('all'); }
+    function showSelectedRoute() { setRouteMode('selected'); }
+    function hideAllRoutes() { setRouteMode('none'); }
+
+    // Fetch all routes
+    async function loadAllRoutes() {
+      const promises = gyms.map(async gym => {
+        const result = await fetchRoute(gym);
+        if (result) {
+          routeData[gym.id] = result;
+          gym.routeDist = result.distKm;
+          gym.routeDur = result.durMin;
+          drawRoute(gym, result.coords);
+
+          // Update distance display on card
+          const distEl = document.getElementById(`route-info-${gym.id}`);
+          if (distEl) {
+            distEl.textContent = `${result.distKm}km · ${result.durMin}분`;
+            distEl.classList.remove('loading');
+          }
+          // Update popup
+          const marker = markers[gym.id];
+          if (marker) {
+            const popupHtml = buildPopupHtml(gym);
+            marker.setPopupContent(popupHtml);
+          }
+        }
+      });
+      await Promise.all(promises);
+    }
+
+    // ── Gym markers ──
+    const markers = {};
+
+    function buildPopupHtml(gym) {
+      const routeInfo = routeData[gym.id];
+      const routeText = routeInfo
+        ? `<div class="popup-detail">${routeInfo.distKm}km 도로 거리 · 차량 ${routeInfo.durMin}분</div>`
+        : `<div class="popup-detail">${gym.dist} (직선거리)</div>`;
+      return `
+        <div class="popup-name">${gym.name}</div>
+        ${routeText}
+        <div class="popup-detail">${gym.schedule}</div>
+        ${gym.price !== '미확인' ? `<div class="popup-price">${gym.price}</div>` : ''}
+        <a href="${gym.gmaps}" target="_blank" class="popup-link">Google Maps에서 보기</a>
+      `;
+    }
+
+    gyms.forEach(gym => {
+      const zoneClass = gym.zone === 'near' ? 'marker-near' : gym.zone === 'mid' ? 'marker-mid' : 'marker-far';
+      const marker = L.marker([gym.lat, gym.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="marker-gym ${zoneClass}" id="marker-${gym.id}">${gym.id}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+          popupAnchor: [0, -15]
+        })
+      }).addTo(map);
+
+      marker.bindPopup(buildPopupHtml(gym));
+      marker.on('click', () => selectPlace(gym.id, 'map'));
+      markers[gym.id] = marker;
+    });
+
+    // Fit bounds
+    const allCoords = [[hotel.lat, hotel.lng], ...gyms.map(g => [g.lat, g.lng])];
+    map.fitBounds(allCoords, { padding: [40, 40] });
+
+    // ── Left panel cards ──
+    function createPlaceCard(gym) {
+      const div = document.createElement('div');
+      div.className = 'place-item';
+      div.id = `card-${gym.id}`;
+      div.setAttribute('role', 'button');
+      div.setAttribute('tabindex', '0');
+      div.setAttribute('aria-label', `${gym.name}, ${gym.dist}`);
+
+      const featureTags = gym.features.map(f => {
+        const cls = f.includes('휴무') || f.includes('휴') ? 'tag-closed' : f.includes('무휴') ? 'tag-schedule' : 'tag-feature';
+        return `<span class="tag ${cls}">${f}</span>`;
+      }).join('');
+
+      div.innerHTML = `
+        <div class="place-header">
+          <span class="place-rank">${gym.id}</span>
+          <span class="place-name">${gym.name}</span>
+          <div class="place-distance-group">
+            <span class="place-distance">${gym.dist}</span>
+            <span class="place-route-info loading" id="route-info-${gym.id}">경로 계산중...</span>
+          </div>
+        </div>
+        <div class="place-meta">
+          ${gym.price !== '미확인'
+            ? `<span class="price">${gym.price}</span>${gym.priceNote ? ` · ${gym.priceNote}` : ''}`
+            : '가격 미확인 (현장 문의)'}
+          <br>${gym.schedule} · <span style="color:#C62828">${gym.closed}</span>
+        </div>
+        <div class="place-tags">
+          ${featureTags}
+          ${gym.id <= 2 ? '<span class="tag tag-recommend">숙소에서 가까움</span>' : ''}
+        </div>
+        <div class="place-hours">
+          <strong>상세 영업시간:</strong><br>${gym.hours}<br>
+          <span style="color:#5D4037;margin-top:4px;display:block">${gym.desc}</span>
+        </div>
+        <div class="place-links">
+          <a href="${gym.gmaps}" target="_blank" class="place-link" onclick="event.stopPropagation()">
+            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            Google Maps
+          </a>
+          ${gym.url ? `<a href="${gym.url}" target="_blank" class="place-link" onclick="event.stopPropagation()">
+            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            공식 사이트
+          </a>` : ''}
+        </div>
+      `;
+
+      div.addEventListener('click', () => selectPlace(gym.id, 'list'));
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPlace(gym.id, 'list'); }
+      });
+      return div;
+    }
+
+    gyms.forEach(gym => {
+      const containerId = gym.zone === 'near' ? 'places-near' : gym.zone === 'mid' ? 'places-mid' : 'places-far';
+      document.getElementById(containerId).appendChild(createPlaceCard(gym));
+    });
+
+    // ── Selection sync ──
+    let selectedId = null;
+    function selectPlace(id, source) {
+      if (selectedId) {
+        const prevCard = document.getElementById(`card-${selectedId}`);
+        if (prevCard) prevCard.classList.remove('active');
+        const prevMarkerEl = document.getElementById(`marker-${selectedId}`);
+        if (prevMarkerEl) prevMarkerEl.classList.remove('selected');
+      }
+
+      selectedId = id;
+      const gym = gyms.find(g => g.id === id);
+      if (!gym) return;
+
+      const card = document.getElementById(`card-${id}`);
+      if (card) {
+        card.classList.add('active');
+        if (source !== 'list') {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+
+      const markerEl = document.getElementById(`marker-${id}`);
+      if (markerEl) markerEl.classList.add('selected');
+
+      if (source !== 'map') {
+        map.setView([gym.lat, gym.lng], 16, { animate: true });
+      }
+      markers[id].openPopup();
+
+      updateRouteVisibility();
+    }
+
+    // ── Init routes ──
+    loadAllRoutes();
+  </script>
+</body>
+</html>

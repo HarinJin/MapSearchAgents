@@ -1,0 +1,19 @@
+{
+  "name": "agentic-map-search",
+  "version": "0.1.0",
+  "description": "Natural language based map search agent system",
+  "type": "module",
+  "scripts": {
+    "search": "node scripts/kakao-search.js",
+    "test:geocode": "node scripts/kakao-search.js geocode '강남역'",
+    "test:keyword": "node scripts/kakao-search.js keyword '카페' --x=127.027610 --y=37.497942",
+    "test:normalize": "node scripts/kakao-search.js keyword '카페' --x=127.027610 --y=37.497942 --normalize"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "yargs": "^17.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

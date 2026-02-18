@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>잠실 어린이 동반 반나절 코스</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 1.8rem;
+    }
+    .subtitle {
+      color: rgba(255,255,255,0.8);
+      text-align: center;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.2rem;
+      color: #333;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #eee;
+    }
+    .place-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .place-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .place-info { flex: 1; }
+    .place-name {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .place-meta {
+      font-size: 0.85rem;
+      color: #666;
+    }
+    .place-link {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+    .place-link:hover { opacity: 0.85; }
+    .itinerary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+    .itinerary .section-title { color: white; border-bottom-color: rgba(255,255,255,0.3); }
+    .itinerary-step {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .itinerary-step:last-child { border-bottom: none; }
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .step-content { flex: 1; }
+    .step-title { font-weight: 600; margin-bottom: 4px; }
+    .step-desc { font-size: 0.9rem; opacity: 0.9; }
+    .footer {
+      text-align: center;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.8rem;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎠 잠실 어린이 동반 반나절 코스</h1>
+    <p class="subtitle">잠실역 기준 도보 10분 이내 장소들</p>
+
+    <!-- 여가/놀이 -->
+    <div class="section">
+      <div class="section-title">🎡 여가 / 놀이</div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">롯데월드 아쿠아리움</div>
+          <div class="place-meta">404m · 해양생물 관람</div>
+        </div>
+        <a href="http://place.map.kakao.com/25974806" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">롯데월드 어드벤처</div>
+          <div class="place-meta">305m · 실내+야외 놀이공원</div>
+        </div>
+        <a href="http://place.map.kakao.com/27560699" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">챔피언더블랙벨트 롯데월드몰 잠실점</div>
+          <div class="place-meta">422m · 놀이교육</div>
+        </div>
+        <a href="http://place.map.kakao.com/30260730" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">플레이타임 롯데마트 잠실월드점</div>
+          <div class="place-meta">378m · 키즈카페</div>
+        </div>
+        <a href="http://place.map.kakao.com/25706446" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">캘리클럽 홈플러스잠실점</div>
+          <div class="place-meta">408m · 키즈카페</div>
+        </div>
+        <a href="http://place.map.kakao.com/309186562" target="_blank" class="place-link">지도보기</a>
+      </div>
+    </div>
+
+    <!-- 식사 -->
+    <div class="section">
+      <div class="section-title">🍽️ 식사</div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">애슐리퀸즈 잠실롯데캐슬점</div>
+          <div class="place-meta">144m · 뷔페</div>
+        </div>
+        <a href="http://place.map.kakao.com/21302210" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">아웃백스테이크하우스 롯데백화점잠실점</div>
+          <div class="place-meta">270m · 스테이크</div>
+        </div>
+        <a href="http://place.map.kakao.com/1766053303" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">매드포갈릭 롯데시네마월드타워점</div>
+          <div class="place-meta">390m · 이탈리안</div>
+        </div>
+        <a href="http://place.map.kakao.com/25972163" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">캐롤스</div>
+          <div class="place-meta">323m · 패밀리레스토랑</div>
+        </div>
+        <a href="http://place.map.kakao.com/172624697" target="_blank" class="place-link">지도보기</a>
+      </div>
+    </div>
+
+    <!-- 카페 -->
+    <div class="section">
+      <div class="section-title">☕ 카페 / 베이커리</div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">런던베이글뮤지엄 잠실점</div>
+          <div class="place-meta">303m · 베이커리카페</div>
+        </div>
+        <a href="http://place.map.kakao.com/1959865002" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">스타벅스 잠실역점</div>
+          <div class="place-meta">236m · 커피</div>
+        </div>
+        <a href="http://place.map.kakao.com/11246062" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">뉴질랜드스토리</div>
+          <div class="place-meta">638m · 석촌호수 뷰</div>
+        </div>
+        <a href="http://place.map.kakao.com/21404892" target="_blank" class="place-link">지도보기</a>
+      </div>
+
+      <div class="place-card">
+        <div class="place-info">
+          <div class="place-name">밀도 롯데백화점잠실점</div>
+          <div class="place-meta">134m · 식빵 전문</div>
+        </div>
+        <a href="http://place.map.kakao.com/1087805899" target="_blank" class="place-link">지도보기</a>
+      </div>
+    </div>
+
+    <!-- 추천 일정 -->
+    <div class="section itinerary">
+      <div class="section-title">📋 추천 일정</div>
+
+      <div class="itinerary-step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <div class="step-title">롯데월드 아쿠아리움 (2시간)</div>
+          <div class="step-desc">아이와 함께 물고기/해양생물 관람</div>
+        </div>
+      </div>
+
+      <div class="itinerary-step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <div class="step-title">애슐리퀸즈 (1시간)</div>
+          <div class="step-desc">뷔페라 아이 먹을 것 다양, 편하게 식사</div>
+        </div>
+      </div>
+
+      <div class="itinerary-step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <div class="step-title">플레이타임 키즈카페 (1.5시간)</div>
+          <div class="step-desc">아이 에너지 소모, 부모는 잠시 휴식</div>
+        </div>
+      </div>
+
+      <div class="itinerary-step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <div class="step-title">런던베이글뮤지엄 (30분)</div>
+          <div class="step-desc">부모 커피 한 잔 + 아이 간식</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footer">🗓️ 생성일: 2026-01-21 · Agentic Map Search (API 검증 완료)</p>
+  </div>
+</body>
+</html>
