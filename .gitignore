@@ -19,6 +19,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Vendor (downloaded CDN files - run: node scripts/vendor-download.mjs)
+vendor/
+
 # Build
 dist/
 build/

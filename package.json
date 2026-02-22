@@ -7,7 +7,9 @@
     "search": "node scripts/kakao-search.js",
     "test:geocode": "node scripts/kakao-search.js geocode '강남역'",
     "test:keyword": "node scripts/kakao-search.js keyword '카페' --x=127.027610 --y=37.497942",
-    "test:normalize": "node scripts/kakao-search.js keyword '카페' --x=127.027610 --y=37.497942 --normalize"
+    "test:normalize": "node scripts/kakao-search.js keyword '카페' --x=127.027610 --y=37.497942 --normalize",
+    "generate": "node scripts/generate-page.js",
+    "generate:open": "node scripts/generate-page.js --open"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
@@ -15,5 +17,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.2"
   }
 }
