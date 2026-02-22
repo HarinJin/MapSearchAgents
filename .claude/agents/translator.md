@@ -21,6 +21,7 @@ Claude Sonnet
 | 활동 관련 | `.claude/skills/map-search/references/slang-activity.md` |
 | 맥락 (연령/직업) | `.claude/skills/map-search/references/slang-context.md` |
 | **시간 조건** | `.claude/skills/map-search/references/slang-time.md` |
+| **거리/이동수단** | `.claude/skills/map-search/references/slang-distance.md` |
 
 ## 처리 과정
 
@@ -78,7 +79,12 @@ Claude Sonnet
   "provider": "kakao",
   "tags": ["분위기 좋은", "수다 떨기 좋은"],
   "suitability": ["친구 모임", "회식"],
-  "disclaimer": null
+  "disclaimer": null,
+
+  "distanceMode": null,
+  "distanceThreshold": null,
+  "travelMode": null,
+  "requires_distance_filter": false
 }
 ```
 
@@ -101,6 +107,52 @@ Claude Sonnet
 ```
 
 **⚠️ `requires_enrichment: true`이면 PlaceEnricher 에이전트 호출 필요**
+
+### 거리 조건이 있는 경우
+
+```json
+{
+  "original": "숙소에서 걸어서 10분 이내 맛집",
+  "interpretation": "숙소에서 도보 10분(약 800m) 이내의 음식점",
+  "search_keywords": ["맛집", "음식점"],
+  "category_codes": ["FD6"],
+  "time_condition": null,
+  "requires_enrichment": false,
+  "confidence": 0.90,
+  "provider": "kakao",
+  "tags": [],
+  "suitability": [],
+  "disclaimer": null,
+  "distanceMode": "point_travel",
+  "distanceThreshold": 800,
+  "travelMode": "walking",
+  "requires_distance_filter": true
+}
+```
+
+**⚠️ `requires_distance_filter: true`이면 Distance Matrix API 호출 필요**
+
+### 경로 검색인 경우
+
+```json
+{
+  "original": "속초에서 광교 가는 길에 맛집",
+  "interpretation": "속초에서 광교까지 이동하는 경로상의 맛집",
+  "search_keywords": ["맛집"],
+  "category_codes": ["FD6"],
+  "time_condition": null,
+  "requires_enrichment": false,
+  "confidence": 0.95,
+  "provider": "kakao",
+  "tags": [],
+  "suitability": [],
+  "disclaimer": null,
+  "distanceMode": "route",
+  "distanceThreshold": null,
+  "travelMode": null,
+  "requires_distance_filter": false
+}
+```
 
 ## 신뢰도 기준
 

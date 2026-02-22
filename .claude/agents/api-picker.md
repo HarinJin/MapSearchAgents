@@ -136,6 +136,10 @@ MapSearch 에이전트의 search_plan을 받습니다:
 | keyword_search | `node scripts/kakao-search.js keyword "검색어" --x=... --y=... --normalize` |
 | category_search | `node scripts/kakao-search.js category CODE --x=... --y=... --normalize` |
 | reverse_geocode | `node scripts/kakao-search.js reverse X Y` |
+| route_polyline (kakao) | `node scripts/kakao-routes.js route --origin='{"lat":...,"lng":...}' --destination='{"lat":...,"lng":...}' --priority=RECOMMEND` |
+| route_polyline (google) | `node scripts/google-routes.js route --origin='{"lat":...,"lng":...}' --destination='{"lat":...,"lng":...}' --mode=DRIVE` |
+| sample_and_search | polyline 파싱 → sampleAlongPolyline → 각 포인트에서 `kakao-search.js keyword` 반복 |
+| distance_filter | `node scripts/google-distance.js filter --origin='{"lat":...,"lng":...}' --places='[...]' --threshold=N --mode=MODE` |
 
 ## provider별 스크립트 분기
 
@@ -164,6 +168,7 @@ Google Places API 스크립트를 사용합니다:
 | google_reviews | `node scripts/google-places.js reviews PLACE_ID` |
 | google_summarize | `node scripts/google-places.js summarize PLACE_ID` |
 | google_enrich | `node scripts/google-places.js enrich --places='[...]'` |
+| google_search_along_route | `node scripts/google-places.js search-along-route --query="검색어" --polyline="encoded..." --origin='{"lat":...,"lng":...}'` |
 
 ### 자동 선택 규칙
 
@@ -381,3 +386,144 @@ node scripts/kakao-search.js keyword "우동" --x=127.027 --y=37.497 --radius=20
 - 가격대
 
 **이 정보가 필요한 경우**: `placeUrl`을 통해 카카오맵 웹페이지에서 직접 확인하도록 안내
+
+## route_polyline 처리
+
+provider에 따라 다른 스크립트를 사용합니다.
+
+### Kakao (국내 경로 — 기본)
+
+```bash
+node scripts/kakao-routes.js route \
+  --origin='{"lat":37.497,"lng":127.027}' \
+  --destination='{"lat":37.278,"lng":127.046}' \
+  --priority=RECOMMEND
+```
+
+옵션:
+- `--priority`: RECOMMEND (기본), TIME, DISTANCE
+- `--avoid`: ferries|toll|motorway|schoolzone|uturn (파이프로 결합)
+
+### Google (해외 경로)
+
+```bash
+node scripts/google-routes.js route \
+  --origin='{"lat":37.497,"lng":127.027}' \
+  --destination='{"lat":37.278,"lng":127.046}' \
+  --mode=DRIVE
+```
+
+### 공통 반환 형식
+
+두 스크립트 모두 동일한 출력 형식을 사용합니다:
+
+```json
+{
+  "success": true,
+  "distanceMeters": 198000,
+  "duration": "2h20m",
+  "decodedPoints": [
+    {"lat": 38.207, "lng": 128.591},
+    {"lat": 38.190, "lng": 128.570}
+  ],
+  "meta": { ... }
+}
+```
+
+`decodedPoints`는 `route-segment.js`의 `sampleAlongPolyline()`과 호환됩니다.
+
+### Provider 선택 규칙
+
+| 조건 | 사용 스크립트 |
+|------|-------------|
+| provider=kakao (국내) | `kakao-routes.js` |
+| provider=google (해외) | `google-routes.js` |
+
+### Fallback
+
+polyline 획득 실패 시 기존 `segment_route` 액션으로 직선 보간 대체.
+
+## sample_and_search 처리
+
+polyline 위에서 적응형 간격으로 샘플 포인트를 추출한 후 각 포인트에서 Kakao 키워드 검색을 수행합니다.
+
+### 처리 흐름
+
+1. `route_polyline` 결과의 `decodedPoints` 파싱
+2. `scripts/utils/route-segment.js`의 `sampleAlongPolyline(points, searchRadius)` 호출
+3. 각 샘플 포인트에서 `kakao-search.js keyword` 실행
+4. 결과 통합 + 중복 제거
+
+### 실행 예시
+
+```bash
+# 각 샘플 포인트에서:
+node scripts/kakao-search.js keyword "맛집" --x=127.027 --y=37.497 --radius=5000 --normalize
+node scripts/kakao-search.js keyword "맛집" --x=127.200 --y=37.300 --radius=5000 --normalize
+# ... (최대 20개 포인트)
+```
+
+### 파라미터
+
+| 파라미터 | 설명 |
+|---------|------|
+| polyline | route_polyline 결과의 decodedPoints 배열 |
+| queries | 검색할 키워드 배열 |
+| searchRadius | 각 포인트에서의 검색 반경 (기본 5000m) |
+
+## distance_filter 처리
+
+Google Distance Matrix API로 실제 이동거리를 계산하여 장소를 필터링합니다.
+
+### 명령어
+
+```bash
+node scripts/google-distance.js filter \
+  --origin='{"lat":37.497,"lng":127.027}' \
+  --places='[{"id":"1","name":"스타벅스","lat":37.5,"lng":127.03}]' \
+  --threshold=5000 \
+  --mode=walking
+```
+
+### 반환 형식
+
+```json
+{
+  "success": true,
+  "places": [
+    {
+      "id": "1",
+      "name": "스타벅스",
+      "travelDistance": 3500,
+      "travelDuration": 480,
+      "travelMode": "walking"
+    }
+  ],
+  "filteredOut": 2,
+  "meta": { "apiCalls": 1, "threshold": 5000, "mode": "walking" }
+}
+```
+
+### Fallback
+
+API 실패 시 Haversine 직선거리로 필터링 + 경고 메시지 포함.
+
+## google_search_along_route 처리
+
+Google Search Along Route (SAR) API로 경로 근처 POI를 단일 API 호출로 검색합니다.
+
+### 명령어
+
+```bash
+node scripts/google-places.js search-along-route \
+  --query="ramen" \
+  --polyline="c~e_Ispe_E..." \
+  --origin='{"lat":35.68,"lng":139.76}'
+```
+
+### 사용 시점
+
+| 조건 | action |
+|------|--------|
+| Google provider + 경로 검색 | google_search_along_route (SAR 1회) |
+| Kakao provider + 경로 검색 | sample_and_search (다중 호출) |

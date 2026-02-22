@@ -26,6 +26,8 @@ Claude Sonnet
 | "~역 근처", "~동에서" | radius | strategy-radius.md |
 | "~에서 ~가는 길에" | route | strategy-route.md |
 | "~와 ~ 사이에" | route | strategy-route.md |
+| "~에서 Nkm/N분 이내" | point_travel | strategy-radius.md (거점 실거리 섹션) |
+| "걸어서/차로 N분" | point_travel | strategy-radius.md (거점 실거리 섹션) |
 | 기타 단일 위치 | radius | strategy-radius.md |
 
 ## 입력 형식
@@ -88,8 +90,26 @@ Claude Sonnet
 - "~에서 ~가는 길에", "~와 ~ 사이에"
 
 **핵심 파라미터** (reference 참조):
-- interval: 총 거리에 따라 2000-10000m
-- searchRadius: 도심 1500-2000m, 외곽 2000-3000m
+- **기본**: Google Routes API polyline → 적응형 간격 샘플링
+- searchRadius: 도심 3000m, 외곽 4000m, 장거리 5000m (기본값)
+- interval = min(2 × searchRadius, ceil(totalDistance / 20))
+- **Fallback**: polyline 획득 실패 시 직선 보간
+
+## point_travel 전략 (strategy-radius.md 거점 실거리 섹션 참조)
+
+**적용 조건**:
+- Translator가 `distanceMode: "point_travel"` 반환
+- "~에서 Nkm 이내", "걸어서 N분" 등 실거리 기반 쿼리
+
+**핵심 파라미터** (reference 참조):
+- 확장 반경: threshold × 1.5 (직선 < 실거리 보정)
+- threshold: Translator의 distanceThreshold 값
+- travelMode: walking (≤2km) 또는 driving (>2km)
+
+**흐름**:
+1. geocode(기준점) → 확장 반경 키워드 검색
+2. distance_filter(실거리 필터링)
+3. travelDistance 기준 정렬
 
 ## 예시: radius 전략
 
@@ -162,22 +182,22 @@ Claude Sonnet
     },
     {
       "step": 3,
-      "action": "segment_route",
+      "action": "route_polyline",
+      "description": "실제 도로 경로 polyline 획득",
       "params": {
-        "start": "${step1}",
-        "end": "${step2}",
-        "interval": 5000,
-        "searchRadius": 2000
+        "origin": { "lat": "${step1.y}", "lng": "${step1.x}" },
+        "destination": { "lat": "${step2.y}", "lng": "${step2.x}" },
+        "mode": "DRIVE"
       }
     },
     {
       "step": 4,
-      "action": "multi_point_multi_keyword_search",
+      "action": "sample_and_search",
+      "description": "polyline 위 샘플링 후 검색",
       "params": {
+        "polyline": "${step3.decodedPoints}",
         "queries": ["해장국", "죽", "우동", "백반"],
-        "points": "${step3.segments}",
-        "radius": 2000,
-        "size": 3
+        "searchRadius": 3000
       }
     }
   ],
@@ -185,6 +205,59 @@ Claude Sonnet
     "deduplicate": true,
     "sort_by": "distance_from_start",
     "group_by_segment": true,
+    "max_results": 10
+  }
+}
+```
+
+## 예시: point_travel 전략
+
+**쿼리**: "숙소에서 5km 이내 맛집"
+
+**Translator 결과**:
+```json
+{
+  "distanceMode": "point_travel",
+  "distanceThreshold": 5000,
+  "travelMode": "driving",
+  "requires_distance_filter": true
+}
+```
+
+**검색 계획**:
+```json
+{
+  "strategy_type": "point_travel",
+  "search_plan": [
+    {
+      "step": 1,
+      "action": "geocode",
+      "params": { "query": "숙소 주소" }
+    },
+    {
+      "step": 2,
+      "action": "keyword_search",
+      "params": {
+        "query": "맛집",
+        "x": "${step1.x}",
+        "y": "${step1.y}",
+        "radius": 7500,
+        "size": 30
+      }
+    },
+    {
+      "step": 3,
+      "action": "distance_filter",
+      "params": {
+        "origin": { "lat": "${step1.y}", "lng": "${step1.x}" },
+        "places": "${step2.places}",
+        "threshold": 5000,
+        "mode": "driving"
+      }
+    }
+  ],
+  "post_processing": {
+    "sort_by": "travelDistance",
     "max_results": 10
   }
 }

@@ -210,3 +210,141 @@ Translator가 여러 키워드를 반환한 경우:
   }
 }
 ```
+
+---
+
+## 거점 실거리 전략 (point_travel)
+
+기준점에서 **실제 이동거리** 기반으로 장소를 필터링하는 전략입니다.
+
+### 적용 조건
+
+Translator가 다음을 반환하면 point_travel 전략 사용:
+- `distanceMode: "point_travel"`
+- `requires_distance_filter: true`
+
+| 패턴 | 예시 |
+|------|------|
+| ~에서 Nkm 이내 | "숙소에서 5km 이내 맛집" |
+| ~에서 N분 이내 | "호텔에서 10분 이내" |
+| 걸어서 N분 | "걸어서 15분 거리 카페" |
+| 차로 N분 | "차로 10분 이내 음식점" |
+
+### 검색 계획 템플릿
+
+```json
+{
+  "strategy_type": "point_travel",
+  "search_plan": [
+    {
+      "step": 1,
+      "action": "geocode",
+      "description": "기준점 좌표 변환",
+      "params": { "query": "{기준점}" }
+    },
+    {
+      "step": 2,
+      "action": "keyword_search",
+      "description": "확장 반경으로 후보 검색",
+      "params": {
+        "query": "{검색어}",
+        "x": "${step1.x}",
+        "y": "${step1.y}",
+        "radius": "{threshold × 1.5}",
+        "size": 30
+      }
+    },
+    {
+      "step": 3,
+      "action": "distance_filter",
+      "description": "실거리 기반 필터링",
+      "params": {
+        "origin": { "lat": "${step1.y}", "lng": "${step1.x}" },
+        "places": "${step2.places}",
+        "threshold": "{distanceThreshold}",
+        "mode": "{travelMode}"
+      }
+    }
+  ],
+  "post_processing": {
+    "sort_by": "travelDistance",
+    "max_results": 10
+  }
+}
+```
+
+### 확장 반경 계산
+
+실거리 > 직선거리이므로, 직선거리 기준 검색으로는 실거리 이내 장소를 놓칠 수 있습니다.
+따라서 **threshold × 1.5**로 넉넉히 검색 후 실거리로 정밀 필터링합니다.
+
+| threshold | 검색 반경 (radius) | 이유 |
+|-----------|-------------------|------|
+| 2000m | 3000m | 도보 거리, 우회로 고려 |
+| 5000m | 7500m | 시내 이동, 도로 구조 고려 |
+| 10000m | 15000m | 장거리, 도로 편차 클 수 있음 |
+
+### travelMode 자동 결정
+
+| 조건 | travelMode | 이유 |
+|------|-----------|------|
+| threshold ≤ 2000m | walking | 도보 거리 |
+| threshold > 2000m | driving | 차량 이동 가정 |
+| "도보", "걸어서" 명시 | walking | 사용자 override |
+| "차로", "자동차" 명시 | driving | 사용자 override |
+
+### distance_filter 결과 정렬
+
+필터링 후 `travelDistance` (실거리) 기준으로 정렬합니다.
+
+### Fallback
+
+Distance Matrix API 실패 시:
+- Haversine 직선거리로 필터링
+- 결과에 경고 메시지 포함: "실거리 계산이 불가하여 직선거리로 필터링했습니다"
+
+### 예시: 숙소에서 도보 10분 이내
+
+**쿼리**: "숙소에서 걸어서 10분 이내 맛집"
+
+**Translator 결과**:
+```json
+{
+  "distanceMode": "point_travel",
+  "distanceThreshold": 800,
+  "travelMode": "walking",
+  "requires_distance_filter": true
+}
+```
+
+**검색 계획**:
+```json
+{
+  "strategy_type": "point_travel",
+  "search_plan": [
+    { "step": 1, "action": "geocode", "params": { "query": "숙소 주소" } },
+    {
+      "step": 2, "action": "keyword_search",
+      "params": {
+        "query": "맛집",
+        "x": "${step1.x}", "y": "${step1.y}",
+        "radius": 1200,
+        "size": 30
+      }
+    },
+    {
+      "step": 3, "action": "distance_filter",
+      "params": {
+        "origin": { "lat": "${step1.y}", "lng": "${step1.x}" },
+        "places": "${step2.places}",
+        "threshold": 800,
+        "mode": "walking"
+      }
+    }
+  ],
+  "post_processing": {
+    "sort_by": "travelDistance",
+    "max_results": 10
+  }
+}
+```

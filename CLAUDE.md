@@ -13,18 +13,42 @@
     ↓
 [1단계] 쿼리 분류 (6개 시나리오 + queryType)
     ↓
-[2단계] 은어/맥락/시간 감지 → Translator 호출
+[2단계] 은어/맥락/시간/거리 감지 → Translator 호출
     ↓
-[2.5단계] Provider 결정 (kakao / google)
+[2.5단계] Provider 결정 (kakao / google) + 거리 모드 결정 (route / point_travel)
     ↓
-[3단계] MapSearch 에이전트로 검색 전략 수립
+[3단계] MapSearch 에이전트로 검색 전략 수립 (route: polyline 기반 / point_travel: 실거리 기반)
     ↓
-[4단계] APIPicker 에이전트로 API 실행 (provider별 분기)
+[4단계] APIPicker 에이전트로 API 실행 (provider별 분기 + 거리 모드별 분기)
+    ↓
+[4.5단계] (거리 조건 있으면) Distance Filter로 실거리 필터링
     ↓
 [5단계] (시간 조건 있으면) PlaceEnricher로 영업시간 보강
     ↓
-[6단계] 결과 통합 + Context 부착 + 응답 생성
+[5.5단계] (결과 ≥5개) Google Places 보강 — 별점/사진/리뷰 수집
+    ↓
+[6단계] (결과 ≥5개) Insight Agent — 리뷰 분석 + 카테고리 생성 + 번역 + 가이드 데이터 출력
+    ↓
+[6.5단계] 결과 통합 + HTML 시각화 페이지 생성 (generate-page.js)
 ```
+
+### Google Places 보강 + 인사이트 자동 트리거
+
+**자동 트리거 조건**: 검색 결과가 **5개 이상**이면 아래 파이프라인을 자동 실행
+
+```
+[5.5단계] Google Places 보강
+  1. 각 장소를 google-places.js find로 Google Place ID 획득
+  2. google-places.js details로 rating, reviewCount, photoUrl 보강
+  3. 리뷰 텍스트 수집 (Insight Agent 입력용)
+
+[6단계] Insight Agent 호출
+  - 수집된 리뷰를 분석하여 guide-schema.md 형식의 가이드 JSON 생성
+  - APP_DATA.guide에 병합
+  - generate-page.js로 HTML 생성 시 가이드 탭 자동 활성화
+```
+
+**5개 미만인 경우**: 보강/인사이트 건너뛰고 기본 검색 결과만 표시
 
 ### PlaceEnricher 호출 조건
 
@@ -37,6 +61,33 @@ Task(
   장소 목록: {api_picker_results}
   시간 조건: {time_condition}"
 )
+```
+
+### 거리 모드 분기
+
+Translator의 결과에 `distanceMode`가 있으면 해당 모드로 처리합니다:
+
+| distanceMode | 처리 | 스크립트 |
+|-------------|------|---------|
+| `route` | 실제 도로 polyline → 적응형 샘플링 → 다중 검색 | `scripts/google-routes.js` |
+| `point_travel` | 확장 반경 검색 → 실거리 필터링 | `scripts/google-distance.js` |
+| `null` | 기존 방식 (radius / route 전략) | - |
+
+**경로 검색 (route)**:
+```
+국내: geocode(출발지) → geocode(도착지) → kakao-routes.js route (polyline)
+      → sampleAlongPolyline(polyline, searchRadius)
+      → 각 포인트에서 Kakao 검색 → 중복 제거 → 경로상 거리순 정렬
+
+해외: geocode(출발지) → geocode(도착지) → google-routes.js route (polyline)
+      → google-places.js search-along-route (SAR 단일 호출)
+```
+
+**거점 실거리 (point_travel)**:
+```
+geocode(기준점) → 확장 반경(threshold × 1.5) 키워드 검색
+→ google-distance.js filter(실거리 필터)
+→ travelDistance 기준 정렬
 ```
 
 ## 쿼리 분류 기준
@@ -173,6 +224,66 @@ Task(
   prompt: "다음 검색 계획을 실행해주세요: {search_plan}"
 )
 ```
+
+### Google Places 보강 (검색 결과 ≥ 5개일 때 자동)
+
+**자동 트리거 조건**: APIPicker 결과가 **5개 이상**이면 자동 실행
+
+APIPicker 결과의 장소들에 대해 Google Places API로 보강:
+
+1. **Find + Details**: 각 장소를 Google에서 찾아 `rating`, `reviewCount`, `photoUrl`, `editorialSummary` 추가
+2. **Reviews 수집**: 각 장소의 리뷰 텍스트 수집 (Insight Agent 입력용)
+
+```bash
+# Step 1: 장소별 Google Place ID 찾기 + 상세 정보
+node scripts/google-places.js find "{displayName}" --lat={lat} --lng={lng}
+node scripts/google-places.js details {PLACE_ID} --fields=name,rating,user_ratings_total,photos,editorial_summary
+
+# Step 2: 리뷰 수집
+node scripts/google-places.js details {PLACE_ID} --fields=name,rating,user_ratings_total,reviews,editorial_summary
+```
+
+보강 결과를 `output/{slug}-enriched.json`에, 리뷰를 `output/{slug}-details-raw.json`에 저장합니다.
+
+### Insight Agent 호출 (검색 결과 ≥ 5개 + 리뷰 수집 후 자동)
+
+**자동 트리거 조건**: 검색 결과가 **5개 이상**이고 리뷰 데이터가 수집된 경우 자동 실행
+
+Google Places Details로 리뷰를 수집한 후 호출합니다:
+
+```
+Task(
+  subagent_type: "insight",
+  prompt: "다음 검색 결과를 분석하여 가이드 인사이트를 생성해주세요.
+
+  검색 맥락: {원본 쿼리 + 조건}
+  장소 데이터: output/{slug}-enriched.json
+  리뷰 데이터: output/{slug}-details-raw.json
+
+  references/guide-schema.md를 참조하여 출력하세요."
+)
+```
+
+**출력**: `guide-schema.md`의 `GuideSchema`를 따르는 JSON
+```json
+{
+  "sections": [
+    {
+      "id": "ocean-view",
+      "icon": "🌅",
+      "title": "오션뷰 & 선셋 맛집",
+      "description": "바다 전망과 석양을 감상하며 식사할 수 있는 곳",
+      "reason": "리뷰에서 뷰를 칭찬하는 리뷰가 많은 식당들이에요...",
+      "placeIds": ["ChIJ_abc123"],
+      "evidence": [...]
+    }
+  ],
+  "tips": ["숙소에서 도보 가능한 식당: 5곳", ...],
+  "warnings": [{ "placeId": "...", "placeName": "...", "text": "사전 예약 권장" }]
+}
+```
+
+Insight Agent 출력은 `APP_DATA.guide`에 병합하여 `generate-page.js`로 HTML을 생성합니다.
 
 ## 결과 통합 규칙
 
@@ -312,6 +423,23 @@ node scripts/google-places.js check-open PLACE_ID
 
 # Google 장소 보강 (영업시간)
 node scripts/google-places.js enrich --places='[{"name":"...", "lat":..., "lng":...}]'
+
+# Kakao 경로 polyline 획득 (국내)
+node scripts/kakao-routes.js route --origin='{"lat":...,"lng":...}' --destination='{"lat":...,"lng":...}' --priority=RECOMMEND
+
+# Google 경로 polyline 획득 (해외)
+node scripts/google-routes.js route --origin='{"lat":...,"lng":...}' --destination='{"lat":...,"lng":...}' --mode=DRIVE
+
+# Google 실거리 필터링
+node scripts/google-distance.js filter --origin='{"lat":...,"lng":...}' --places='[...]' --threshold=5000 --mode=walking
+
+# Google Search Along Route (해외 경로)
+node scripts/google-places.js search-along-route --query="검색어" --polyline="encoded..." --origin='{"lat":...,"lng":...}'
+
+# HTML 페이지 생성
+node scripts/generate-page.js --file=results.json --open
+node scripts/generate-page.js --data='JSON문자열' --open
+cat results.json | node scripts/generate-page.js --open
 ```
 
 ### 카테고리 코드 참고

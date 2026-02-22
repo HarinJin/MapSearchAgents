@@ -10,6 +10,11 @@ triggers:
   - "음식점"
   - "가는 길에"
   - "추천"
+  - "이내"
+  - "걸어서"
+  - "차로"
+  - "km"
+  - "분 거리"
 ---
 
 # Map Search - 자연어 지도 검색 스킬
@@ -31,7 +36,11 @@ triggers:
     ↓
 [5] (시간 조건 있으면) PlaceEnricher Agent (references/api-google-places.md 참조)
     ↓
-[6] 결과 통합 및 응답 생성
+[5.5] Google Places Details 수집 (리뷰 데이터)
+    ↓
+[6] Insight Agent — 가이드 인사이트 생성 (references/guide-schema.md 참조)
+    ↓
+[6.5] 결과 통합 + HTML 페이지 생성
 ```
 
 ## 쿼리 분류
@@ -174,6 +183,67 @@ Task(
 }
 ```
 
+### 5. Google Places 보강 (별점 + 사진 + 리뷰)
+
+**자동 트리거 조건**: 검색 결과가 **5개 이상**이면 자동 실행
+
+APIPicker 결과의 장소들에 대해 Google Places API로 보강:
+
+1. **Find + Details**: 각 장소를 Google에서 찾아 `rating`, `reviewCount`, `photoUrl` 추가
+2. **Reviews 수집**: 각 장소의 리뷰 텍스트 수집 (Insight Agent 입력용)
+
+```
+# Step 1: 장소별 Google Place ID 찾기 + 상세 정보 (rating, photo)
+google-places.js find "{displayName}" --lat={lat} --lng={lng}
+google-places.js details {PLACE_ID} --fields=name,rating,user_ratings_total,photos,editorial_summary
+
+# Step 2: 리뷰 수집
+google-places.js details {PLACE_ID} --fields=name,rating,user_ratings_total,reviews,editorial_summary
+```
+
+보강 결과를 `enriched.json`에, 리뷰를 `details-raw.json`에 저장합니다.
+
+### 6. Insight Agent (자동 트리거)
+
+**자동 트리거 조건**: 검색 결과가 **5개 이상**이고 리뷰 데이터가 수집된 경우 자동 실행
+
+Google Places Details로 리뷰를 수집한 후 호출:
+
+```
+Task(
+  subagent_type: "insight",
+  prompt: |
+    다음 검색 결과를 분석하여 가이드 인사이트를 생성해주세요.
+
+    검색 맥락: {query + 조건}
+    장소 데이터: output/{slug}-enriched.json
+    리뷰 데이터: output/{slug}-details-raw.json
+
+    references/guide-schema.md를 참조하여 출력하세요.
+)
+```
+
+**기대 출력**: `guide-schema.md`의 `GuideSchema`를 따르는 JSON 객체
+```json
+{
+  "sections": [
+    {
+      "id": "ocean-view",
+      "icon": "🌅",
+      "title": "오션뷰 & 선셋 맛집",
+      "description": "바다 전망과 석양을 감상하며 식사할 수 있는 곳",
+      "reason": "리뷰에서 뷰를 칭찬하는 리뷰가 많은 식당들이에요...",
+      "placeIds": ["ChIJ_abc123"],
+      "evidence": [...]
+    }
+  ],
+  "tips": ["숙소에서 도보 가능한 식당: 5곳", ...],
+  "warnings": [{ "placeId": "...", "placeName": "...", "text": "사전 예약 권장" }]
+}
+```
+
+Insight Agent 출력은 `APP_DATA.guide`에 병합하여 `generate-page.js`로 HTML을 생성합니다.
+
 ## 결과 통합
 
 1. **중복 제거**: place_url 기준
@@ -214,10 +284,12 @@ Task(
 - `references/slang-activity.md` - 활동 관련 은어 사전
 - `references/slang-context.md` - 맥락(연령대, 직업) 사전
 - `references/slang-time.md` - ⏰ 시간 조건 감지 사전
-- `references/strategy-radius.md` - 반경 검색 전략
+- `references/slang-distance.md` - 📏 거리/이동수단 키워드 사전
+- `references/strategy-radius.md` - 반경 검색 전략 + 거점 실거리 전략
 - `references/strategy-route.md` - 경로 검색 전략
 - `references/api-commands.md` - 카카오맵 API 명령어
 - `references/api-google-places.md` - Google Places API 명령어 (영업시간)
+- `references/guide-schema.md` - 가이드 데이터 스키마 (Insight Agent 출력 계약)
 
 ## 사용 예시
 
@@ -231,6 +303,16 @@ Task(
 ```
 "홍대 근처 힙한 카페 추천해줘"
 "회식 장소 찾아줘 역삼역 근처"
+```
+
+### 📏 거리/경로 조건 예시 (Distance Mode)
+
+```
+"숙소에서 5km 이내 맛집"
+"걸어서 10분 이내 카페"
+"차로 15분 거리 음식점"
+"속초에서 광교까지 이동 중 맛집"
+"서울에서 부산 가는 길에 휴게소 맛집"
 ```
 
 ### ⏰ 시간 조건 예시 (PlaceEnricher 호출)
