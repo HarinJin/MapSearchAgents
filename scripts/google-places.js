@@ -487,6 +487,92 @@ function extractKeywords(texts) {
     .map(k => k.label);
 }
 
+// Search places along a route using Google Places Text Search (New) API
+async function searchAlongRoute(query, encodedPolyline, options = {}) {
+  checkApiKey();
+
+  const NEW_API_URL = 'https://places.googleapis.com/v1/places:searchText';
+
+  const body = {
+    textQuery: query,
+    searchAlongRouteParameters: {
+      polyline: {
+        encodedPolyline: encodedPolyline
+      }
+    },
+    languageCode: 'ko'
+  };
+
+  if (options.origin) {
+    body.routingParameters = {
+      origin: {
+        latitude: options.origin.lat,
+        longitude: options.origin.lng
+      }
+    };
+  }
+
+  try {
+    const response = await fetch(NEW_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': API_KEY,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.types,places.googleMapsUri,places.photos,routingSummaries'
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error?.status || `HTTP ${response.status}`,
+        message: data.error?.message || 'Unknown error'
+      };
+    }
+
+    const places = (data.places || []).map((place, idx) => {
+      const mapped = {
+        place_id: place.id ? place.id.replace(/^places\//, '') : null,
+        name: place.displayName?.text || null,
+        address: place.formattedAddress || null,
+        location: place.location
+          ? { lat: place.location.latitude, lng: place.location.longitude }
+          : null,
+        rating: place.rating ?? null,
+        reviewCount: place.userRatingCount ?? null,
+        openNow: place.currentOpeningHours?.openNow ?? null,
+        types: place.types || [],
+        url: place.googleMapsUri || null
+      };
+
+      // Attach per-place routing summary if available
+      if (data.routingSummaries && data.routingSummaries[idx]) {
+        mapped.routingSummary = data.routingSummaries[idx];
+      } else {
+        mapped.routingSummary = null;
+      }
+
+      return mapped;
+    });
+
+    return {
+      success: true,
+      places,
+      totalCount: places.length,
+      meta: { apiCalls: 1 }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: 'Network error',
+      message: error.message
+    };
+  }
+}
+
 // CLI
 yargs(hideBin(process.argv))
   .command('find <query>', 'Find place by text query', (yargs) => {
@@ -555,6 +641,38 @@ yargs(hideBin(process.argv))
   }, async (argv) => {
     const result = await summarizePlace(argv.placeId);
     console.log(JSON.stringify(result, null, 2));
+  })
+  .command('search-along-route', 'Search places along a route using encoded polyline', (yargs) => {
+    return yargs
+      .option('query', {
+        describe: 'Search query',
+        type: 'string',
+        demandOption: true
+      })
+      .option('polyline', {
+        describe: 'Encoded polyline string representing the route',
+        type: 'string',
+        demandOption: true
+      })
+      .option('origin', {
+        describe: 'JSON string with lat/lng for routing origin, e.g. \'{"lat":35.68,"lng":139.76}\'',
+        type: 'string'
+      });
+  }, async (argv) => {
+    try {
+      let origin;
+      if (argv.origin) {
+        origin = JSON.parse(argv.origin);
+      }
+      const result = await searchAlongRoute(argv.query, argv.polyline, { origin });
+      console.log(JSON.stringify(result, null, 2));
+    } catch (e) {
+      console.error(JSON.stringify({
+        success: false,
+        error: 'Invalid arguments',
+        message: e.message
+      }, null, 2));
+    }
   })
   .demandCommand(1, 'You need to specify a command')
   .help()

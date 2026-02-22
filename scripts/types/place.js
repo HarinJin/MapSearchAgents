@@ -160,6 +160,11 @@ export function normalizeKakaoPlace(rawPlace = {}) {
     reviewCount: null,
     photoUrl: null,
 
+    // Travel distance (Distance Matrix enrichment)
+    travelDistance: null,    // 실거리 (meters)
+    travelDuration: null,   // 이동시간 (seconds)
+    travelMode: null,       // 'driving' | 'walking'
+
     // === Layer 3: Context (에이전트 해석 메타데이터) ===
     tags: [],
     suitability: [],
@@ -263,6 +268,11 @@ export function normalizeGooglePlace(rawPlace = {}) {
     reviewCount,
     photoUrl,
 
+    // Travel distance (Distance Matrix enrichment)
+    travelDistance: null,
+    travelDuration: null,
+    travelMode: null,
+
     // Layer 3: Context (defaults)
     tags: [],
     suitability: [],
@@ -336,6 +346,11 @@ export const AgentResponseSchema = {
 
   // Provider
   provider: 'kakao',            // 'kakao' | 'google'
+
+  // 거리 모드
+  distanceMode: null,           // 'route' | 'point_travel' | null
+  distanceThreshold: null,      // meters (point_travel에서 사용)
+  travelMode: null,             // 'driving' | 'walking' | null
 
   // 검색 조건
   searchParams: {
@@ -448,6 +463,8 @@ export function sortPlaces(places, sortBy = 'distance') {
   switch (sortBy) {
     case 'distance':
       return sorted.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+    case 'travelDistance':
+      return sorted.sort((a, b) => (a.travelDistance || Infinity) - (b.travelDistance || Infinity));
     case 'relevance':
     default:
       return sorted; // 기본 순서 유지 (API가 반환한 순서)
@@ -470,6 +487,11 @@ export function filterPlaces(places, filters = {}) {
 
     // 거리 필터
     if (filters.maxDistance && place.distance > filters.maxDistance) {
+      return false;
+    }
+
+    // 실거리 필터
+    if (filters.maxTravelDistance && place.travelDistance !== null && place.travelDistance > filters.maxTravelDistance) {
       return false;
     }
 
@@ -520,6 +542,19 @@ export function formatPlacesForDisplay(places, options = {}) {
     if (place.rating !== null) formatted.rating = place.rating;
     if (place.reviewCount !== null) formatted.reviewCount = place.reviewCount;
     if (place.photoUrl) formatted.photoUrl = place.photoUrl;
+
+    // Travel distance info
+    if (place.travelDistance !== null) {
+      formatted.travelDistance = place.travelDistance;
+      formatted.travelDuration = place.travelDuration;
+      formatted.travelMode = place.travelMode;
+      formatted.travelDistanceText = place.travelDistance >= 1000
+        ? `${(place.travelDistance / 1000).toFixed(1)}km`
+        : `${place.travelDistance}m`;
+      formatted.travelDurationText = place.travelDuration
+        ? `${Math.round(place.travelDuration / 60)}분`
+        : null;
+    }
 
     // Layer 3: Context (non-null/non-empty만 포함)
     if (place.tags?.length > 0) formatted.tags = place.tags;
