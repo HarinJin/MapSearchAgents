@@ -130,9 +130,146 @@ export function generateSearchPlans(segments, searchParams = {}) {
   }));
 }
 
+/**
+ * Calculate total length of a polyline
+ *
+ * @param {Array<{lat, lng}>} polylineCoords - Array of coordinate objects
+ * @returns {number} Total distance in meters
+ */
+export function calculatePolylineLength(polylineCoords) {
+  let total = 0;
+  for (let i = 1; i < polylineCoords.length; i++) {
+    const prev = polylineCoords[i - 1];
+    const curr = polylineCoords[i];
+    total += haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+  }
+  return total;
+}
+
+/**
+ * Calculate the optimal sampling interval along a polyline
+ *
+ * @param {number} totalDistance - Total polyline length in meters
+ * @param {number} searchRadius - Search radius per sample point in meters
+ * @returns {number} Interval in meters
+ */
+export function calculateOptimalInterval(totalDistance, searchRadius) {
+  const maxCoverage = 2 * searchRadius;
+  const minPoints = Math.ceil(totalDistance / maxCoverage);
+  if (minPoints <= 20) {
+    return maxCoverage;
+  }
+  return Math.ceil(totalDistance / 20);
+}
+
+/**
+ * Sample points along a polyline at a coverage-optimal interval
+ *
+ * @param {Array<{lat, lng}>} polylineCoords - Array of coordinate objects
+ * @param {number} [searchRadius=5000] - Search radius per sample in meters
+ * @returns {Array<{lat, lng, distanceFromStart, label}>}
+ */
+export function sampleAlongPolyline(polylineCoords, searchRadius = 5000) {
+  const totalDistance = calculatePolylineLength(polylineCoords);
+  const interval = calculateOptimalInterval(totalDistance, searchRadius);
+
+  const samples = [];
+  let accumulated = 0;
+  let segmentIndex = 1;
+
+  // Always include the first point
+  samples.push({
+    lat: polylineCoords[0].lat,
+    lng: polylineCoords[0].lng,
+    distanceFromStart: 0,
+    label: 'start'
+  });
+
+  for (let i = 1; i < polylineCoords.length; i++) {
+    const prev = polylineCoords[i - 1];
+    const curr = polylineCoords[i];
+    const segDist = haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+    accumulated += segDist;
+
+    if (accumulated >= interval) {
+      // Only add if it's not the last point (we add that separately)
+      if (i < polylineCoords.length - 1) {
+        samples.push({
+          lat: curr.lat,
+          lng: curr.lng,
+          distanceFromStart: Math.round(accumulated),
+          label: `segment_${segmentIndex}`
+        });
+        segmentIndex++;
+        // Reset accumulator so next interval is measured from this point
+        accumulated = 0;
+      }
+    }
+  }
+
+  // Always include the last point
+  const last = polylineCoords[polylineCoords.length - 1];
+  samples.push({
+    lat: last.lat,
+    lng: last.lng,
+    distanceFromStart: Math.round(totalDistance),
+    label: 'end'
+  });
+
+  return samples;
+}
+
+/**
+ * Segment a route based on actual polyline coordinates
+ *
+ * Returns the same structure as segmentRoute for API compatibility.
+ *
+ * @param {Array<{lat, lng}>} polylineCoords - Array of coordinate objects
+ * @param {Object} [options={}]
+ * @param {number} [options.searchRadius=5000] - Search radius per sample in meters
+ * @returns {{ totalDistance, numSegments, interval, searchRadius, segments }}
+ */
+export function segmentRouteByPolyline(polylineCoords, options = {}) {
+  const searchRadius = options.searchRadius !== undefined ? options.searchRadius : 5000;
+  const totalDistance = calculatePolylineLength(polylineCoords);
+  const interval = calculateOptimalInterval(totalDistance, searchRadius);
+  const points = sampleAlongPolyline(polylineCoords, searchRadius);
+
+  return {
+    totalDistance: Math.round(totalDistance),
+    numSegments: points.length,
+    interval,
+    searchRadius,
+    segments: points.map(p => ({
+      point: { x: p.lng, y: p.lat },
+      searchRadius,
+      distanceFromStart: p.distanceFromStart,
+      label: p.label
+    }))
+  };
+}
+
+/**
+ * Generate search plans from a polyline segment result
+ *
+ * Delegates to generateSearchPlans since the output structure is identical.
+ *
+ * @param {Object} segmentResult - Result from segmentRouteByPolyline
+ * @param {Object} [searchParams={}] - Additional search parameters
+ * @returns {Array} Array of search plans
+ */
+export function generateSearchPlansFromPolyline(segmentResult, searchParams = {}) {
+  return generateSearchPlans(segmentResult, searchParams);
+}
+
 export default {
   haversineDistance,
   interpolatePoint,
   segmentRoute,
-  generateSearchPlans
+  generateSearchPlans,
+  calculatePolylineLength,
+  calculateOptimalInterval,
+  sampleAlongPolyline,
+  segmentRouteByPolyline,
+  generateSearchPlansFromPolyline
 };
