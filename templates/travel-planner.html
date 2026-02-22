@@ -1,0 +1,2176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__PAGE_TITLE__</title>
+
+  <!-- Google Fonts: Inter for clean UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+  <style>
+    /* ============================================
+       CSS Variables & Reset
+       ============================================ */
+    :root {
+      --left-w: 360px;
+      --right-w: 380px;
+      --header-h: 0px;
+      --color-primary: #0EA5E9;
+      --color-primary-light: #38BDF8;
+      --color-primary-dark: #0369A1;
+      --color-accent: #F97316;
+      --color-accent-light: #FB923C;
+      --color-bg: #F0F9FF;
+      --color-surface: #FFFFFF;
+      --color-border: #E2E8F0;
+      --color-text: #0C4A6E;
+      --color-text-secondary: #475569;
+      --color-text-muted: #94A3B8;
+      --color-success: #10B981;
+      --color-warning: #F59E0B;
+      --color-danger: #EF4444;
+      --color-info: #3B82F6;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 6px -1px rgba(14,165,233,0.1), 0 2px 4px -2px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 25px -5px rgba(14,165,233,0.15), 0 4px 6px -4px rgba(0,0,0,0.05);
+      --shadow-xl: 0 20px 40px -10px rgba(14,165,233,0.2);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --transition: 0.2s ease;
+      /* Category colors */
+      --cat-fd6: #EF4444;
+      --cat-ce7: #10B981;
+      --cat-at4: #0EA5E9;
+      --cat-ct1: #8B5CF6;
+      --cat-ad5: #F59E0B;
+      --cat-hp8: #EC4899;
+      --cat-default: #94A3B8;
+      /* Day colors */
+      --day-1: #0EA5E9;
+      --day-2: #8B5CF6;
+      --day-3: #10B981;
+      --day-4: #F97316;
+      --day-5: #EF4444;
+      /* Focus ring */
+      --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Skip link for accessibility */
+    .skip-link {
+      position: absolute; top: -40px; left: 0; z-index: 9999;
+      padding: 8px 16px; background: var(--color-primary); color: white;
+      text-decoration: none; font-size: 0.85rem; font-weight: 600;
+      border-radius: 0 0 var(--radius-sm) 0;
+      transition: top 0.2s;
+    }
+    .skip-link:focus { top: 0; }
+
+    /* Focus-visible styles for keyboard navigation */
+    :focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+      border-radius: var(--radius-sm);
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+      color: var(--color-text);
+      background: var(--color-bg);
+      overflow: hidden;
+      height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ============================================
+       3-Panel Grid Layout
+       ============================================ */
+    .app-container {
+      display: grid;
+      grid-template-columns: var(--left-w) 1fr var(--right-w);
+      height: 100vh;
+      position: relative;
+    }
+
+    .app-container.left-collapsed { grid-template-columns: 0px 1fr var(--right-w); }
+    .app-container.right-collapsed { grid-template-columns: var(--left-w) 1fr 0px; }
+    .app-container.left-collapsed.right-collapsed { grid-template-columns: 0px 1fr 0px; }
+
+    /* ============================================
+       Panel Toggle Buttons
+       ============================================ */
+    .panel-toggle {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1000;
+      width: 24px;
+      height: 64px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      box-shadow: var(--shadow-md);
+      transition: background var(--transition);
+    }
+    .panel-toggle:hover { background: var(--color-bg); }
+    .panel-toggle.left-toggle { left: var(--left-w); }
+    .panel-toggle.right-toggle {
+      right: var(--right-w);
+      border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    }
+    .app-container.left-collapsed .panel-toggle.left-toggle { left: 0; }
+    .app-container.right-collapsed .panel-toggle.right-toggle { right: 0; }
+
+    /* ============================================
+       Left Panel - Place List
+       ============================================ */
+    .left-panel {
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-border);
+      transition: width var(--transition);
+    }
+    .app-container.left-collapsed .left-panel { width: 0; overflow: hidden; }
+
+    .left-header {
+      padding: 20px;
+      background: linear-gradient(135deg, #0EA5E9 0%, #0369A1 50%, #0C4A6E 100%);
+      color: white;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .left-header::after {
+      content: '';
+      position: absolute; top: -50%; right: -30%;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .left-header h1 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.01em; }
+    .left-header .query-text { font-size: 0.85rem; opacity: 0.9; }
+    .left-header .result-count {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: 1.5px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition);
+      flex-shrink: 0;
+    }
+    .filter-chip:hover { border-color: var(--color-primary-light); color: var(--color-primary); }
+    .filter-chip.active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+    .filter-chip .chip-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+
+    .sort-select {
+      margin-left: auto;
+      padding: 4px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      background: var(--color-surface);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .scenario-banner {
+      padding: 10px 16px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+    .scenario-banner.info { background: #EFF6FF; color: #1E40AF; }
+    .scenario-banner.warning { background: #FFFBEB; color: #92400E; }
+    .scenario-banner .banner-icon { flex-shrink: 0; }
+
+    .place-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .category-section { margin-bottom: 8px; }
+    .category-section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      padding: 8px 8px 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .category-section-title .cat-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+
+    .place-card {
+      position: relative;
+      padding: 12px;
+      margin-bottom: 4px;
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all var(--transition);
+      border-left: 3px solid transparent;
+    }
+    .place-card:hover {
+      background: var(--color-bg);
+      transform: translateX(2px);
+      box-shadow: var(--shadow-sm);
+    }
+    .place-card.active {
+      border-left-color: var(--color-primary);
+      background: #E0F2FE;
+      box-shadow: var(--shadow-md);
+    }
+    .place-card.in-plan::after {
+      content: '';
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--color-primary);
+    }
+    .place-card[draggable="true"] { cursor: grab; }
+    .place-card.dragging { opacity: 0.5; }
+
+    .place-card .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .place-card .card-number {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .place-card .card-info { flex: 1; min-width: 0; }
+    .place-card .card-name {
+      font-size: 0.9rem; font-weight: 600; color: var(--color-text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .place-card .card-detail-cat {
+      font-size: 0.75rem; color: var(--color-text-muted); margin-top: 1px;
+    }
+    .place-card .card-address {
+      font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .place-card .card-meta {
+      display: flex; align-items: center; gap: 8px; margin-top: 6px;
+      font-size: 0.75rem; color: var(--color-text-secondary);
+      flex-wrap: wrap;
+    }
+    .place-card .card-rating { color: var(--color-warning); font-weight: 600; }
+    .place-card .card-open { font-weight: 500; }
+    .place-card .card-open.open { color: var(--color-success); }
+    .place-card .card-open.closed { color: var(--color-danger); }
+    .place-card .card-distance { color: var(--color-text-muted); }
+    .place-card .card-closing-warning {
+      font-size: 0.7rem; color: var(--color-warning); font-weight: 500;
+    }
+
+    .badge-row {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 2px;
+      padding: 2px 6px; border-radius: 999px;
+      font-size: 0.65rem; font-weight: 500;
+    }
+    .badge.tag { background: #E0F2FE; color: #0369A1; }
+    .badge.suit { background: #ECFDF5; color: #065F46; }
+    .badge.trip-role { background: #FEF3C7; color: #92400E; }
+    .badge.day-group { background: #F0F9FF; color: #0369A1; }
+    .badge.disclaimer-badge { background: #FEF2F2; color: #991B1B; }
+
+    .place-card .card-link {
+      display: inline-block; margin-top: 6px;
+      font-size: 0.7rem; color: var(--color-primary); text-decoration: none;
+    }
+    .place-card .card-link:hover { text-decoration: underline; }
+
+    /* Thumbnail photo in place card */
+    .place-card .card-thumb {
+      width: 64px; height: 64px; flex-shrink: 0;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      background: var(--color-bg);
+    }
+
+    .place-card .add-to-plan-btn {
+      display: none;
+      position: absolute; top: 8px; right: 8px;
+      padding: 4px 10px; border-radius: 999px;
+      background: var(--color-accent); color: white;
+      font-size: 0.65rem; font-weight: 600; border: none;
+      cursor: pointer; z-index: 2;
+      transition: background 0.15s ease, transform 0.1s ease;
+      box-shadow: 0 2px 4px rgba(249,115,22,0.3);
+    }
+    .place-card .add-to-plan-btn:hover { background: #EA580C; }
+    .place-card .add-to-plan-btn:active { transform: scale(0.95); }
+    .place-card:hover .add-to-plan-btn { display: block; }
+    .place-card.in-plan:hover .add-to-plan-btn { display: none; }
+
+    .legend-bar {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--color-border);
+      font-size: 0.7rem; color: var(--color-text-secondary);
+      flex-shrink: 0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ============================================
+       Center - Map
+       ============================================ */
+    .map-container {
+      position: relative;
+      height: 100vh;
+    }
+    #map { width: 100%; height: 100%; }
+
+    .leaflet-popup-content { margin: 10px 14px; }
+    .popup-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 2px; }
+    .popup-category { font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px; }
+    .popup-meta { font-size: 0.8rem; color: var(--color-text-secondary); margin-bottom: 8px; }
+    .popup-link {
+      display: inline-block; padding: 5px 12px; border-radius: var(--radius-sm);
+      background: var(--color-primary); color: white; text-decoration: none;
+      font-size: 0.8rem; font-weight: 500;
+    }
+    .popup-link:hover { background: var(--color-primary-dark); }
+
+    .custom-marker-icon {
+      display: flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 50%;
+      color: white; font-size: 12px; font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid white;
+      transition: transform 0.15s ease;
+    }
+    .custom-marker-icon.selected {
+      transform: scale(1.3);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    }
+
+    /* ============================================
+       Right Panel - Travel Planner
+       ============================================ */
+    .right-panel {
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-surface);
+      border-left: 1px solid var(--color-border);
+      transition: width var(--transition);
+    }
+    .app-container.right-collapsed .right-panel { width: 0; overflow: hidden; }
+
+    .right-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+    .right-header .header-top {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .right-header .plan-title-input {
+      font-size: 1rem; font-weight: 600; border: none; outline: none;
+      background: transparent; color: var(--color-text); width: 60%;
+    }
+    .right-header .plan-title-input::placeholder { color: var(--color-text-muted); }
+    .right-header .header-actions {
+      display: flex; gap: 6px;
+    }
+    .btn-icon {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border); background: var(--color-surface);
+      color: var(--color-text-secondary); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: all var(--transition);
+    }
+    .btn-icon:hover { background: var(--color-bg); color: var(--color-primary); }
+
+    .day-tab-bar {
+      display: flex; gap: 4px; padding: 8px 16px;
+      border-bottom: 1px solid var(--color-border);
+      overflow-x: auto; flex-shrink: 0;
+    }
+    .day-tab {
+      padding: 6px 14px; border-radius: 999px;
+      font-size: 0.8rem; font-weight: 500;
+      border: 1.5px solid var(--color-border);
+      background: var(--color-surface); color: var(--color-text-secondary);
+      cursor: pointer; transition: all var(--transition);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .day-tab:hover { border-color: var(--color-primary-light); }
+    .day-tab.active {
+      background: var(--color-primary); color: white;
+      border-color: var(--color-primary);
+    }
+    .day-tab.add-day {
+      border-style: dashed; color: var(--color-text-muted);
+    }
+    .day-tab.add-day:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    /* Right Panel Mode Tabs */
+    .right-mode-tabs {
+      display: flex; gap: 0; border-bottom: 2px solid var(--color-border); flex-shrink: 0;
+    }
+    .right-mode-tab {
+      flex: 1; padding: 12px 16px; border: none; background: transparent;
+      font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted);
+      cursor: pointer; transition: all var(--transition);
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+    }
+    .right-mode-tab:hover { color: var(--color-text-secondary); background: var(--color-bg); }
+    .right-mode-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+    /* Guide Sections */
+    .guide-section {
+      margin-bottom: 20px; border-radius: var(--radius-md);
+      border: 1px solid var(--color-border); overflow: hidden;
+    }
+    .guide-section-header {
+      padding: 12px 16px; background: var(--color-bg);
+      cursor: pointer; display: flex; align-items: center; gap: 10px;
+      user-select: none; transition: background var(--transition);
+    }
+    .guide-section-header:hover { background: #E0F2FE; }
+    .guide-section-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .guide-section-info { flex: 1; }
+    .guide-section-title { font-weight: 600; font-size: 0.9rem; color: var(--color-text); }
+    .guide-section-desc { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
+    .guide-section-count {
+      font-size: 0.7rem; font-weight: 600; color: var(--color-primary);
+      background: #E0F2FE; border-radius: 999px; padding: 2px 8px;
+    }
+    .guide-section-toggle { font-size: 0.7rem; color: var(--color-text-muted); transition: transform 0.2s; }
+    .guide-section.open .guide-section-toggle { transform: rotate(180deg); }
+
+    .guide-section-body { display: none; border-top: 1px solid var(--color-border); }
+    .guide-section.open .guide-section-body { display: block; }
+
+    .guide-place-item {
+      padding: 10px 16px; border-bottom: 1px solid #F1F5F9;
+      cursor: pointer; transition: background var(--transition);
+    }
+    .guide-place-item:last-child { border-bottom: none; }
+    .guide-place-item:hover { background: #F8FAFC; }
+    .guide-place-item.active { background: #EFF6FF; border-left: 3px solid var(--color-primary); }
+    .guide-place-name {
+      font-weight: 600; font-size: 0.85rem; color: var(--color-text);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .guide-place-meta {
+      font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px;
+    }
+
+    .guide-evidence {
+      margin-top: 8px; padding: 8px 12px; border-radius: var(--radius-sm);
+      background: #FFFBEB; border-left: 3px solid #F59E0B;
+    }
+    .guide-evidence-text {
+      font-size: 0.78rem; color: #92400E; font-style: italic; line-height: 1.5;
+    }
+    .guide-evidence-author {
+      font-size: 0.7rem; color: #B45309; margin-top: 4px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .guide-evidence-original-toggle {
+      font-size: 0.7rem; color: #6B7280; cursor: pointer; margin-top: 3px;
+      user-select: none;
+    }
+    .guide-evidence-original-toggle:hover { color: #374151; text-decoration: underline; }
+    .guide-evidence-original {
+      font-size: 0.72rem; color: #9CA3AF; font-style: italic; line-height: 1.4;
+      margin-top: 4px; padding: 6px 8px; background: #FEF9C3; border-radius: 4px;
+    }
+    .guide-section-reason {
+      font-size: 0.8rem; color: #4B5563; line-height: 1.6;
+      padding: 10px 12px; margin-bottom: 12px;
+      background: #F0F9FF; border-radius: 6px; border-left: 3px solid #60A5FA;
+    }
+
+    /* Guide Tips */
+    .guide-tips {
+      margin-bottom: 20px; padding: 14px 16px;
+      border-radius: var(--radius-md); background: #F0FDF4; border: 1px solid #BBF7D0;
+    }
+    .guide-tips-title { font-weight: 600; font-size: 0.85rem; color: #166534; margin-bottom: 8px; }
+    .guide-tip-item {
+      font-size: 0.78rem; color: #15803D; padding: 3px 0;
+      display: flex; align-items: flex-start; gap: 6px;
+    }
+    .guide-tip-bullet { flex-shrink: 0; }
+
+    /* Guide Warnings */
+    .guide-warnings {
+      margin-bottom: 20px; padding: 14px 16px;
+      border-radius: var(--radius-md); background: #FEF2F2; border: 1px solid #FECACA;
+    }
+    .guide-warnings-title { font-weight: 600; font-size: 0.85rem; color: #991B1B; margin-bottom: 8px; }
+    .guide-warning-item {
+      font-size: 0.78rem; color: #DC2626; padding: 3px 0;
+      display: flex; align-items: flex-start; gap: 6px;
+    }
+    .guide-warning-place { font-weight: 600; }
+
+    .day-itinerary {
+      flex: 1; overflow-y: auto; padding: 12px 16px;
+    }
+
+    .itinerary-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100%; color: var(--color-text-muted);
+      text-align: center; padding: 20px;
+    }
+    .itinerary-empty .empty-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+    .itinerary-empty .empty-text { font-size: 0.85rem; line-height: 1.5; }
+
+    .drop-zone {
+      min-height: 60px; border: 2px dashed transparent;
+      border-radius: var(--radius-md); transition: all var(--transition);
+    }
+    .drop-zone.drag-over {
+      border-color: var(--color-primary-light);
+      background: #E0F2FE;
+    }
+
+    .itinerary-slot {
+      display: flex; gap: 8px; padding: 10px;
+      background: var(--color-bg); border-radius: var(--radius-md);
+      margin-bottom: 4px; position: relative;
+      border: 1px solid transparent;
+      transition: all var(--transition);
+    }
+    .itinerary-slot:hover { box-shadow: var(--shadow-sm); }
+    .itinerary-slot.active {
+      border-color: var(--color-primary-light); background: #E0F2FE;
+    }
+    .itinerary-slot.dragging { opacity: 0.4; }
+
+    .itinerary-slot .drag-handle {
+      cursor: grab; color: var(--color-text-muted); font-size: 14px;
+      display: flex; align-items: center; padding: 0 2px;
+      user-select: none;
+    }
+    .itinerary-slot .drag-handle:active { cursor: grabbing; }
+
+    .itinerary-slot .slot-number {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .itinerary-slot .slot-info { flex: 1; min-width: 0; }
+    .itinerary-slot .slot-name {
+      font-size: 0.85rem; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .itinerary-slot .slot-category {
+      font-size: 0.7rem; color: var(--color-text-muted);
+    }
+    .itinerary-slot .slot-time-input {
+      display: flex; align-items: center; gap: 4px; margin-top: 4px;
+    }
+    .itinerary-slot .slot-time-input input {
+      width: 70px; padding: 2px 6px; border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); font-size: 0.7rem;
+      color: var(--color-text-secondary);
+    }
+    .itinerary-slot .slot-time-input span {
+      font-size: 0.7rem; color: var(--color-text-muted);
+    }
+    .itinerary-slot .slot-note {
+      width: 100%; margin-top: 4px; padding: 4px 6px;
+      border: 1px solid transparent; border-radius: var(--radius-sm);
+      font-size: 0.7rem; color: var(--color-text-secondary);
+      background: transparent; resize: none; outline: none;
+      font-family: inherit;
+    }
+    .itinerary-slot .slot-note:focus {
+      border-color: var(--color-border); background: white;
+    }
+    .itinerary-slot .slot-remove {
+      position: absolute; top: 4px; right: 4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      border: none; background: transparent; color: var(--color-text-muted);
+      cursor: pointer; font-size: 12px; display: none;
+      align-items: center; justify-content: center;
+    }
+    .itinerary-slot:hover .slot-remove { display: flex; }
+    .itinerary-slot .slot-remove:hover { background: #FEE2E2; color: var(--color-danger); }
+
+    .route-segment-info {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 4px 0; color: var(--color-text-muted);
+      font-size: 0.7rem;
+    }
+    .route-segment-info .seg-line {
+      width: 1px; height: 16px; background: var(--color-border);
+    }
+    .route-segment-info .seg-text {
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    .day-actions {
+      display: flex; gap: 8px; padding: 12px 16px;
+      border-top: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+    .btn {
+      padding: 7px 14px; border-radius: var(--radius-sm);
+      font-size: 0.8rem; font-weight: 500; border: 1px solid var(--color-border);
+      background: var(--color-surface); color: var(--color-text-secondary);
+      cursor: pointer; transition: all var(--transition);
+    }
+    .btn:hover { background: var(--color-bg); color: var(--color-primary); border-color: var(--color-primary-light); }
+    .btn.btn-primary {
+      background: var(--color-primary); color: white; border-color: var(--color-primary);
+    }
+    .btn.btn-primary:hover { background: var(--color-primary-dark); }
+
+    .trip-summary {
+      padding: 12px 16px;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-bg);
+      flex-shrink: 0;
+    }
+    .trip-summary .summary-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.75rem; color: var(--color-text-secondary);
+      margin-bottom: 2px;
+    }
+    .trip-summary .summary-value { font-weight: 600; color: var(--color-text); }
+
+    /* ============================================
+       Save/Load Modal
+       ============================================ */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.4); align-items: center; justify-content: center;
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--color-surface); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg); padding: 24px; width: 400px;
+      max-height: 70vh; overflow-y: auto;
+    }
+    .modal h3 { font-size: 1rem; margin-bottom: 16px; }
+    .modal .saved-plan-item {
+      padding: 10px; border: 1px solid var(--color-border);
+      border-radius: var(--radius-md); margin-bottom: 8px;
+      cursor: pointer; transition: all var(--transition);
+    }
+    .modal .saved-plan-item:hover { border-color: var(--color-primary-light); background: var(--color-bg); }
+    .modal .saved-plan-item .plan-name { font-weight: 600; font-size: 0.85rem; }
+    .modal .saved-plan-item .plan-date { font-size: 0.7rem; color: var(--color-text-muted); }
+    .modal .modal-close {
+      margin-top: 12px; padding: 8px 20px; border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border); background: var(--color-surface);
+      cursor: pointer; font-size: 0.85rem; width: 100%;
+    }
+    .modal .modal-close:hover { background: var(--color-bg); }
+
+    /* ============================================
+       Mobile Bottom Bar
+       ============================================ */
+    .mobile-bar {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--color-surface); border-top: 1px solid var(--color-border);
+      z-index: 1100; padding: 8px;
+    }
+    .mobile-bar .tabs {
+      display: flex; justify-content: center; gap: 4px;
+    }
+    .mobile-bar .tab-btn {
+      flex: 1; padding: 12px; border: none; background: none;
+      font-size: 0.8rem; font-weight: 500; color: var(--color-text-secondary);
+      cursor: pointer; border-radius: var(--radius-md);
+      text-align: center; min-height: 44px;
+      transition: all var(--transition);
+    }
+    .mobile-bar .tab-btn:hover { background: var(--color-bg); }
+    .mobile-bar .tab-btn.active {
+      background: var(--color-primary); color: white;
+      box-shadow: 0 2px 8px rgba(14,165,233,0.3);
+    }
+
+    /* ============================================
+       Responsive
+       ============================================ */
+    @media (max-width: 1024px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+      .left-panel, .right-panel {
+        position: fixed; top: 0; bottom: 48px; z-index: 1050;
+        width: 100%; max-width: 400px;
+      }
+      .left-panel { left: 0; transform: translateX(-100%); }
+      .left-panel.mobile-open { transform: translateX(0); }
+      .right-panel { right: 0; transform: translateX(100%); }
+      .right-panel.mobile-open { transform: translateX(0); }
+      .map-container { height: calc(100vh - 48px); }
+      .panel-toggle { display: none; }
+      .mobile-bar { display: block; }
+    }
+
+    /* ============================================
+       Scrollbar
+       ============================================ */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+
+    /* ============================================
+       Animations
+       ============================================ */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .fade-in { animation: fadeIn 0.2s ease; }
+
+    /* Button press micro-interaction */
+    .btn:active, .day-tab:active, .filter-chip:active, .btn-icon:active {
+      transform: scale(0.97);
+    }
+    .day-tab:active { transform: scale(0.95); }
+
+    /* Smooth panel transitions on mobile */
+    .left-panel, .right-panel {
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width var(--transition);
+    }
+
+    /* Reduced motion for accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* High contrast mode improvements */
+    @media (forced-colors: active) {
+      .place-card.active { border: 2px solid CanvasText; }
+      .filter-chip.active { border: 2px solid Highlight; }
+      .custom-marker-icon { border: 2px solid CanvasText; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Skip link for keyboard users -->
+  <a href="#map" class="skip-link">지도로 건너뛰기</a>
+
+  <div class="app-container" id="appContainer" role="main">
+    <!-- Left Panel -->
+    <aside class="left-panel" id="leftPanel" aria-label="장소 목록 패널">
+      <div class="left-header" id="leftHeader"></div>
+      <div class="filter-bar" id="filterBar" role="toolbar" aria-label="카테고리 필터"></div>
+      <div id="scenarioBanners" role="status" aria-live="polite"></div>
+      <div class="place-list" id="placeList" role="list" aria-label="검색 결과 장소 목록"></div>
+      <div class="legend-bar" id="legendBar" aria-label="카테고리 범례"></div>
+    </aside>
+
+    <!-- Center Map -->
+    <div class="map-container">
+      <div id="map" role="application" aria-label="장소 지도"></div>
+    </div>
+
+    <!-- Right Panel -->
+    <aside class="right-panel" id="rightPanel" aria-label="여행 계획 패널">
+      <!-- Tab switcher -->
+      <div class="right-mode-tabs" id="rightModeTabs">
+        <button class="right-mode-tab active" data-mode="guide" onclick="switchRightMode('guide')">🧭 가이드</button>
+        <button class="right-mode-tab" data-mode="planner" onclick="switchRightMode('planner')">📋 일정</button>
+      </div>
+
+      <!-- Guide Mode -->
+      <div class="right-mode-content" id="guideMode" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+        <div class="guide-scroll" id="guideContent" style="flex:1;overflow-y:auto;padding:16px"></div>
+      </div>
+
+      <!-- Planner Mode (existing content) -->
+      <div class="right-mode-content" id="plannerMode" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+        <div class="right-header" id="rightHeader"></div>
+        <div class="day-tab-bar" id="dayTabBar" role="tablist" aria-label="일차 선택"></div>
+        <div class="day-itinerary drop-zone" id="dayItinerary" role="tabpanel" aria-label="일정 목록"></div>
+        <div class="day-actions" id="dayActions"></div>
+        <div class="trip-summary" id="tripSummary" aria-label="여행 요약"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Panel Toggles -->
+  <button class="panel-toggle left-toggle" id="leftToggle" aria-label="장소 목록 패널 접기/펼치기" title="장소 목록 패널 접기/펼치기"></button>
+  <button class="panel-toggle right-toggle" id="rightToggle" aria-label="여행 계획 패널 접기/펼치기" title="여행 계획 패널 접기/펼치기"></button>
+
+  <!-- Load Modal -->
+  <div class="modal-overlay" id="loadModal" role="dialog" aria-modal="true" aria-labelledby="loadModalTitle">
+    <div class="modal">
+      <h3 id="loadModalTitle">저장된 여행 계획</h3>
+      <div id="savedPlansList"></div>
+      <button class="modal-close" onclick="closeLoadModal()">닫기</button>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Bar -->
+  <nav class="mobile-bar" id="mobileBar" aria-label="패널 전환">
+    <div class="tabs" role="tablist">
+      <button class="tab-btn" role="tab" aria-selected="false" onclick="showMobilePanel('left')">장소 목록</button>
+      <button class="tab-btn active" role="tab" aria-selected="true" onclick="showMobilePanel('map')">지도</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="mobileRightTab" onclick="showMobilePanel('right')">여행 계획</button>
+    </div>
+  </nav>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet MarkerCluster JS -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <!-- Kakao Maps SDK (replace YOUR_KAKAO_JS_KEY with your JavaScript API key from Kakao Developers) -->
+  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_JS_KEY&libraries=services&autoload=false"
+    onerror="window.__kakaoFailed=true"></script>
+
+  <script>
+    // ============================================
+    // Configuration
+    // ============================================
+    const CONFIG = {
+      kakaoJsKey: 'YOUR_KAKAO_JS_KEY', // Replace with your Kakao JS API key
+      defaultZoom: 14,
+      walkingSpeed: 80,   // meters per minute
+      drivingSpeed: 500,  // meters per minute (30km/h urban)
+    };
+
+    // ============================================
+    // Category Colors & Icons
+    // ============================================
+    const CATEGORY_COLORS = {
+      FD6: 'var(--cat-fd6)', CE7: 'var(--cat-ce7)', AT4: 'var(--cat-at4)',
+      CT1: 'var(--cat-ct1)', AD5: 'var(--cat-ad5)', HP8: 'var(--cat-hp8)',
+      default: 'var(--cat-default)'
+    };
+    const CATEGORY_RAW_COLORS = {
+      FD6: '#EF4444', CE7: '#10B981', AT4: '#0EA5E9',
+      CT1: '#8B5CF6', AD5: '#F59E0B', HP8: '#EC4899',
+      default: '#94A3B8'
+    };
+    const CATEGORY_ICONS = {
+      FD6: '🍽️', CE7: '☕', AT4: '🏛️', CT1: '🎭', AD5: '🏨', HP8: '🏥',
+      default: '📍'
+    };
+    const CATEGORY_NAMES = {
+      FD6: '음식점', CE7: '카페', AT4: '관광명소', CT1: '문화시설', AD5: '숙박', HP8: '병원'
+    };
+    const DAY_COLORS = ['#0EA5E9', '#8B5CF6', '#10B981', '#F97316', '#EF4444', '#EC4899', '#6366F1'];
+
+    // ============================================
+    // APP_DATA - Injected by generate-page.js
+    // ============================================
+    const APP_DATA = /* __APP_DATA__ */ {};
+
+    // ============================================
+    // App State
+    // ============================================
+    const AppState = {
+      selectedPlaceId: null,
+      activeDay: 1,
+      leftPanelOpen: true,
+      rightPanelOpen: true,
+      activeCategories: new Set(),
+      sortBy: 'distance',
+      travelPlan: {
+        title: '',
+        days: [
+          { label: '1일차', places: [], notes: {}, timeSlots: {} },
+          { label: '2일차', places: [], notes: {}, timeSlots: {} },
+          { label: '3일차', places: [], notes: {}, timeSlots: {} }
+        ]
+      },
+      markers: {},
+      routeLines: [],
+      _listeners: []
+    };
+
+    function subscribe(fn) { AppState._listeners.push(fn); }
+    function notify(changed) { AppState._listeners.forEach(fn => fn(changed)); }
+
+    function setState(updates, changed) {
+      Object.assign(AppState, updates);
+      notify(changed || Object.keys(updates));
+    }
+
+    // ============================================
+    // Utilities
+    // ============================================
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function formatDistance(meters) {
+      if (meters >= 1000) return (meters / 1000).toFixed(1) + 'km';
+      return Math.round(meters) + 'm';
+    }
+
+    function formatTravelTime(meters) {
+      const walkMin = Math.round(meters / CONFIG.walkingSpeed);
+      const driveMin = Math.round(meters / CONFIG.drivingSpeed);
+      const parts = [];
+      if (walkMin > 0) parts.push(`도보 ${walkMin}분`);
+      if (driveMin > 0) parts.push(`차량 ${driveMin}분`);
+      else parts.push('차량 1분 미만');
+      return parts.join(' / ');
+    }
+
+    function getCatColor(code) {
+      if (CATEGORY_RAW_COLORS[code]) return CATEGORY_RAW_COLORS[code];
+      // Auto-assign color for custom category codes (e.g. area-based grouping)
+      const allCodes = [...new Set(APP_DATA.places.map(p => p.categoryCode))];
+      const palette = ['#EF4444', '#10B981', '#0EA5E9', '#8B5CF6', '#F59E0B', '#EC4899', '#6366F1', '#F97316'];
+      const idx = allCodes.indexOf(code);
+      return idx >= 0 ? palette[idx % palette.length] : CATEGORY_RAW_COLORS.default;
+    }
+    function getCatIcon(code) { return CATEGORY_ICONS[code] || CATEGORY_ICONS.default; }
+    function getCatName(code) { return CATEGORY_NAMES[code] || code || '기타'; }
+    function getDayColor(dayIdx) { return DAY_COLORS[(dayIdx - 1) % DAY_COLORS.length]; }
+
+    function isPlaceInPlan(placeId) {
+      return AppState.travelPlan.days.some(d => d.places.some(p => p.id === placeId));
+    }
+
+    function getPlaceById(id) { return APP_DATA.places.find(p => p.id === id); }
+
+    function getFilteredPlaces() {
+      let places = [...APP_DATA.places];
+      if (AppState.activeCategories.size > 0) {
+        places = places.filter(p => AppState.activeCategories.has(p.categoryCode));
+      }
+      if (AppState.sortBy === 'distance') {
+        places.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      }
+      return places;
+    }
+
+    function groupByCategory(places) {
+      const groups = {};
+      places.forEach(p => {
+        const key = p.categoryCode || 'default';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(p);
+      });
+      return groups;
+    }
+
+    // ============================================
+    // Map Adapter (Leaflet-based, Kakao-ready)
+    // ============================================
+    let mapInstance = null;
+    let clusterGroup = null;
+    const mapMarkers = {};
+    let mapRouteLines = [];
+    let searchRouteLines = []; // Separate layer — never cleared by itinerary
+
+    const MapAdapter = {
+      init(containerId, center, zoom) {
+        mapInstance = L.map(containerId).setView([center.lat, center.lng], zoom || CONFIG.defaultZoom);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(mapInstance);
+        clusterGroup = L.markerClusterGroup({
+          maxClusterRadius: 40,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          iconCreateFunction: function(cluster) {
+            const count = cluster.getChildCount();
+            return L.divIcon({
+              html: `<div style="background:var(--color-primary);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${count}</div>`,
+              className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+            });
+          }
+        });
+        mapInstance.addLayer(clusterGroup);
+      },
+
+      addMarker(place, index) {
+        const color = getCatColor(place.categoryCode);
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="custom-marker-icon" data-id="${place.id}" style="background:${color}">${index + 1}</div>`,
+          iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -18]
+        });
+
+        const marker = L.marker([place.lat, place.lng], { icon });
+        marker.placeId = place.id;
+
+        const popupHtml = MapAdapter._createPopup(place);
+        marker.bindPopup(popupHtml, { maxWidth: 260 });
+
+        marker.on('click', () => {
+          selectPlace(place.id, 'map');
+        });
+
+        clusterGroup.addLayer(marker);
+        mapMarkers[place.id] = marker;
+      },
+
+      _createPopup(place) {
+        let meta = '';
+        if (place.rating != null) meta += `<span style="color:#F59E0B;font-weight:600">⭐ ${place.rating}</span> `;
+        if (place.reviewCount != null) meta += `(${place.reviewCount.toLocaleString()}) `;
+        if (place.openNow === true) meta += `<span style="color:#10B981">🟢 영업중</span> `;
+        else if (place.openNow === false) meta += `<span style="color:#EF4444">🔴 영업종료</span> `;
+        if (place.distance) meta += `<span style="color:#94A3B8">${formatDistance(place.distance)}</span>`;
+
+        return `
+          <div class="popup-name">${place.displayName}</div>
+          <div class="popup-category">${place.detailCategory || place.categoryGroupName}</div>
+          ${meta ? `<div class="popup-meta">${meta}</div>` : ''}
+          <a href="${place.placeUrl}" target="_blank" class="popup-link" onclick="event.stopPropagation()">
+            ${place.provider === 'google' ? 'Google Maps' : '카카오맵'}에서 보기
+          </a>
+        `;
+      },
+
+      highlightMarker(placeId) {
+        Object.values(mapMarkers).forEach(m => {
+          const el = m.getElement();
+          if (el) el.querySelector('.custom-marker-icon')?.classList.remove('selected');
+        });
+        const marker = mapMarkers[placeId];
+        if (marker) {
+          const el = marker.getElement();
+          if (el) el.querySelector('.custom-marker-icon')?.classList.add('selected');
+        }
+      },
+
+      panTo(lat, lng, zoom) {
+        if (mapInstance) mapInstance.setView([lat, lng], zoom || 16, { animate: true });
+      },
+
+      openPopup(placeId) {
+        const marker = mapMarkers[placeId];
+        if (marker) {
+          // If in cluster, spiderfy first
+          const parent = clusterGroup.getVisibleParent(marker);
+          if (parent && parent !== marker) {
+            mapInstance.setView(marker.getLatLng(), 17, { animate: true });
+            setTimeout(() => marker.openPopup(), 400);
+          } else {
+            marker.openPopup();
+          }
+        }
+      },
+
+      fitBounds(places) {
+        if (!places || places.length === 0) return;
+        const coords = places.map(p => [p.lat, p.lng]);
+        mapInstance.fitBounds(coords, { padding: [60, 60], maxZoom: 16 });
+      },
+
+      clearRouteLines() {
+        mapRouteLines.forEach(l => mapInstance.removeLayer(l));
+        mapRouteLines = [];
+      },
+
+      addRouteLine(coords, options = {}) {
+        const line = L.polyline(coords, {
+          color: options.color || '#4F46E5',
+          weight: options.weight || 3,
+          opacity: options.opacity || 0.7,
+          dashArray: options.dashed ? '8, 8' : null
+        }).addTo(mapInstance);
+        mapRouteLines.push(line);
+        return line;
+      },
+
+      drawItineraryRoute(dayIndex) {
+        MapAdapter.clearRouteLines();
+        const day = AppState.travelPlan.days[dayIndex - 1];
+        if (!day || day.places.length < 2) return;
+
+        const color = getDayColor(dayIndex);
+        const coords = day.places.map(p => [p.lat, p.lng]);
+        MapAdapter.addRouteLine(coords, { color, weight: 3, opacity: 0.6 });
+      },
+
+      invalidateSize() {
+        if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 100);
+      },
+
+      removeAllMarkers() {
+        clusterGroup.clearLayers();
+        Object.keys(mapMarkers).forEach(k => delete mapMarkers[k]);
+      }
+    };
+
+    // ============================================
+    // Render: Left Panel
+    // ============================================
+    function renderLeftHeader() {
+      const el = document.getElementById('leftHeader');
+      const pinSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;opacity:0.85"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+      el.innerHTML = `
+        <h1>${APP_DATA.query}</h1>
+        <div class="query-text">${pinSvg} ${APP_DATA.searchParams.location?.name || ''} ${APP_DATA.searchParams.radius ? `반경 ${(APP_DATA.searchParams.radius/1000).toFixed(0)}km` : ''}</div>
+        <div class="result-count">${APP_DATA.places.length}개 장소 · ${APP_DATA.scenarios.join(', ')} 시나리오</div>
+      `;
+    }
+
+    function renderFilterBar() {
+      const el = document.getElementById('filterBar');
+      const cats = [...new Set(APP_DATA.places.map(p => p.categoryCode))];
+
+      let html = '';
+      cats.forEach(code => {
+        const isActive = AppState.activeCategories.has(code);
+        html += `<button class="filter-chip ${isActive ? 'active' : ''}" data-cat="${code}" aria-pressed="${isActive}" onclick="toggleCategory('${code}')">
+          <span class="chip-dot" style="background:${getCatColor(code)}"></span>
+          ${getCatName(code)}
+        </button>`;
+      });
+
+      html += `<select class="sort-select" onchange="changeSortBy(this.value)" aria-label="정렬 기준">
+        <option value="distance" ${AppState.sortBy === 'distance' ? 'selected' : ''}>거리순</option>
+        <option value="relevance" ${AppState.sortBy === 'relevance' ? 'selected' : ''}>관련도순</option>
+      </select>`;
+
+      el.innerHTML = html;
+    }
+
+    function renderScenarioBanners() {
+      const el = document.getElementById('scenarioBanners');
+      let html = '';
+
+      if (APP_DATA.timeCondition) {
+        html += `<div class="scenario-banner info">
+          <span class="banner-icon">⏰</span>
+          <span>${APP_DATA.timeCondition.userGuidance || '시간 조건이 적용되었습니다'}</span>
+        </div>`;
+      }
+
+      const hasDisclaimer = APP_DATA.places.some(p => p.disclaimer);
+      if (hasDisclaimer) {
+        html += `<div class="scenario-banner warning">
+          <span class="banner-icon">⚠️</span>
+          <span>반려동물 동반 가능 여부는 방문 전 매장에 직접 확인을 권장합니다</span>
+        </div>`;
+      }
+
+      if (APP_DATA.provider === 'google') {
+        html += `<div class="scenario-banner info">
+          <span class="banner-icon">🌏</span>
+          <span>해외 장소 정보는 실제와 다를 수 있습니다</span>
+        </div>`;
+      }
+
+      if (APP_DATA.limitations?.length > 0) {
+        APP_DATA.limitations.forEach(lim => {
+          html += `<div class="scenario-banner info">
+            <span class="banner-icon">ℹ️</span>
+            <span>${lim}</span>
+          </div>`;
+        });
+      }
+
+      el.innerHTML = html;
+    }
+
+    function renderPlaceList() {
+      const el = document.getElementById('placeList');
+      const places = getFilteredPlaces();
+      const groups = groupByCategory(places);
+
+      if (places.length === 0) {
+        el.innerHTML = `<div class="itinerary-empty">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-text">검색 결과가 없습니다.<br>필터를 변경하거나 검색 범위를 넓혀보세요.</div>
+        </div>`;
+        return;
+      }
+
+      let html = '';
+      let globalIndex = 0;
+
+      Object.entries(groups).forEach(([catCode, catPlaces]) => {
+        html += `<div class="category-section">
+          <div class="category-section-title">
+            <span class="cat-dot" style="background:${getCatColor(catCode)}"></span>
+            ${getCatIcon(catCode)} ${getCatName(catCode)} (${catPlaces.length})
+          </div>`;
+
+        catPlaces.forEach(place => {
+          const idx = APP_DATA.places.indexOf(place);
+          const isActive = AppState.selectedPlaceId === place.id;
+          const inPlan = isPlaceInPlan(place.id);
+
+          html += `<div class="place-card fade-in ${isActive ? 'active' : ''} ${inPlan ? 'in-plan' : ''}"
+            role="listitem" data-id="${place.id}" draggable="true"
+            aria-label="${place.displayName}"
+            onclick="selectPlace('${place.id}', 'list')"
+            ondragstart="onPlaceDragStart(event, '${place.id}')">
+            <button class="add-to-plan-btn" onclick="event.stopPropagation(); addToPlan('${place.id}')" aria-label="${place.displayName} 일정에 추가">+ 일정 추가</button>
+            <div class="card-top">
+              <div class="card-number" style="background:${getCatColor(place.categoryCode)}">${idx + 1}</div>
+              <div class="card-info">
+                <div class="card-name">${place.displayName}</div>
+                <div class="card-detail-cat">${place.detailCategory || place.categoryGroupName}</div>
+              </div>
+              ${place.photoUrl ? `<img class="card-thumb" src="${place.photoUrl}" alt="${place.displayName} 사진" loading="lazy" onerror="this.style.display='none'">` : ''}
+            </div>
+            <div class="card-address">${place.roadAddress || place.formattedAddress}</div>
+            <div class="card-meta">
+              ${place.rating != null ? `<span class="card-rating">⭐ ${place.rating}${place.reviewCount ? ` (${place.reviewCount.toLocaleString()})` : ''}</span>` : ''}
+              ${place.openNow === true ? '<span class="card-open open">🟢 영업중</span>' : ''}
+              ${place.openNow === false ? '<span class="card-open closed">🔴 영업종료</span>' : ''}
+              ${place.distance ? `<span class="card-distance">${formatDistance(place.distance)}</span>` : ''}
+            </div>
+            ${place.closingWarning ? `<div class="card-closing-warning">⚠️ ${place.closingWarning}</div>` : ''}
+            ${renderBadges(place)}
+            <a href="${place.placeUrl}" target="_blank" class="card-link" onclick="event.stopPropagation()">${place.provider === 'google' ? 'Google Maps' : '카카오맵'}에서 보기 →</a>
+          </div>`;
+          globalIndex++;
+        });
+
+        html += '</div>';
+      });
+
+      el.innerHTML = html;
+    }
+
+    function renderBadges(place) {
+      let badges = '';
+      if (place.tags?.length) {
+        badges += place.tags.map(t => `<span class="badge tag">${t}</span>`).join('');
+      }
+      if (place.suitability?.length) {
+        badges += place.suitability.map(s => `<span class="badge suit">${s}</span>`).join('');
+      }
+      if (place.tripRole) {
+        badges += `<span class="badge trip-role">${place.tripRole}</span>`;
+      }
+      if (place.dayGroup !== null && place.dayGroup !== undefined) {
+        badges += `<span class="badge day-group">${place.dayGroup}일차</span>`;
+      }
+      if (place.disclaimer) {
+        badges += `<span class="badge disclaimer-badge">⚠️ 확인필요</span>`;
+      }
+      return badges ? `<div class="badge-row">${badges}</div>` : '';
+    }
+
+    function renderLegend() {
+      const el = document.getElementById('legendBar');
+      const cats = [...new Set(APP_DATA.places.map(p => p.categoryCode))];
+      el.innerHTML = cats.map(code =>
+        `<div class="legend-item"><span class="legend-dot" style="background:${getCatColor(code)}"></span>${getCatName(code)}</div>`
+      ).join('');
+    }
+
+    // ============================================
+    // Render: Map Markers
+    // ============================================
+    function renderMapMarkers() {
+      MapAdapter.removeAllMarkers();
+      const places = getFilteredPlaces();
+      places.forEach((place, i) => {
+        const idx = APP_DATA.places.indexOf(place);
+        MapAdapter.addMarker(place, idx);
+      });
+    }
+
+    // ============================================
+    // Render: Right Panel
+    // ============================================
+    function renderRightHeader() {
+      const el = document.getElementById('rightHeader');
+      el.innerHTML = `
+        <div class="header-top">
+          <input class="plan-title-input" type="text" placeholder="여행 제목을 입력하세요"
+            value="${AppState.travelPlan.title}"
+            onchange="AppState.travelPlan.title = this.value"
+            aria-label="여행 계획 제목">
+          <div class="header-actions">
+            <button class="btn-icon" onclick="savePlan()" title="저장" aria-label="여행 계획 저장">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            </button>
+            <button class="btn-icon" onclick="openLoadModal()" title="불러오기" aria-label="저장된 여행 계획 불러오기">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDayTabs() {
+      const el = document.getElementById('dayTabBar');
+      let html = '';
+      AppState.travelPlan.days.forEach((day, i) => {
+        const dayNum = i + 1;
+        const isActive = AppState.activeDay === dayNum;
+        const count = day.places.length;
+        html += `<button class="day-tab ${isActive ? 'active' : ''}" role="tab" aria-selected="${isActive}" style="${isActive ? `background:${getDayColor(dayNum)};border-color:${getDayColor(dayNum)}` : ''}"
+          onclick="switchDay(${dayNum})">${day.label}${count ? ` (${count})` : ''}</button>`;
+      });
+      html += `<button class="day-tab add-day" onclick="addDay()">+ 추가</button>`;
+      el.innerHTML = html;
+    }
+
+    function renderDayItinerary() {
+      const el = document.getElementById('dayItinerary');
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      if (!day) return;
+
+      if (day.places.length === 0) {
+        el.innerHTML = `<div class="itinerary-empty">
+          <div class="empty-icon">📋</div>
+          <div class="empty-text">좌측에서 장소를 드래그하거나<br>"+ 일정 추가" 버튼으로 일정을 만들어보세요</div>
+        </div>`;
+        return;
+      }
+
+      let html = '';
+      day.places.forEach((place, i) => {
+        const isActive = AppState.selectedPlaceId === place.id;
+        const color = getDayColor(AppState.activeDay);
+        const timeSlot = day.timeSlots[place.id] || {};
+        const note = day.notes[place.id] || '';
+
+        html += `<div class="itinerary-slot ${isActive ? 'active' : ''}" data-id="${place.id}" data-index="${i}"
+          draggable="true"
+          onclick="selectPlace('${place.id}', 'itinerary')"
+          ondragstart="onSlotDragStart(event, ${i})"
+          ondragover="onSlotDragOver(event)"
+          ondrop="onSlotDrop(event, ${i})">
+          <div class="drag-handle">≡</div>
+          <div class="slot-number" style="background:${color}">${i + 1}</div>
+          <div class="slot-info">
+            <div class="slot-name">${place.displayName}</div>
+            <div class="slot-category">${getCatIcon(place.categoryCode)} ${place.detailCategory || place.categoryGroupName}${place.tripRole ? ` · ${place.tripRole}` : ''}</div>
+            <div class="slot-time-input">
+              <input type="time" value="${timeSlot.start || ''}"
+                onchange="updateTimeSlot('${place.id}', 'start', this.value)" placeholder="시작">
+              <span>~</span>
+              <input type="time" value="${timeSlot.end || ''}"
+                onchange="updateTimeSlot('${place.id}', 'end', this.value)" placeholder="종료">
+            </div>
+            <textarea class="slot-note" rows="1" placeholder="메모..."
+              onchange="updateNote('${place.id}', this.value)">${note}</textarea>
+          </div>
+          <button class="slot-remove" onclick="event.stopPropagation(); removeFromPlan(${i})">✕</button>
+        </div>`;
+
+        // Route segment info between slots
+        if (i < day.places.length - 1) {
+          const next = day.places[i + 1];
+          const dist = haversineDistance(place.lat, place.lng, next.lat, next.lng);
+          html += `<div class="route-segment-info">
+            <div class="seg-line"></div>
+            <div class="seg-text">
+              <span>${formatDistance(dist)}</span> · <span>${formatTravelTime(dist)}</span>
+            </div>
+            <div class="seg-line"></div>
+          </div>`;
+        }
+      });
+
+      el.innerHTML = html;
+    }
+
+    function renderDayActions() {
+      const el = document.getElementById('dayActions');
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      const hasPlaces = day && day.places.length >= 2;
+      el.innerHTML = `
+        <button class="btn" onclick="optimizeRoute()" ${!hasPlaces ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''} aria-label="경로 최적화">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>경로 최적화
+        </button>
+        <button class="btn" onclick="clearDay()" aria-label="일차 초기화">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>일차 초기화
+        </button>
+      `;
+    }
+
+    function renderTripSummary() {
+      const el = document.getElementById('tripSummary');
+      const days = AppState.travelPlan.days;
+      const totalPlaces = days.reduce((sum, d) => sum + d.places.length, 0);
+      let totalDist = 0;
+      days.forEach(d => {
+        for (let i = 0; i < d.places.length - 1; i++) {
+          totalDist += haversineDistance(d.places[i].lat, d.places[i].lng, d.places[i+1].lat, d.places[i+1].lng);
+        }
+      });
+
+      el.innerHTML = `
+        <div class="summary-row"><span>총 일수</span><span class="summary-value">${days.length}일</span></div>
+        <div class="summary-row"><span>총 장소</span><span class="summary-value">${totalPlaces}곳</span></div>
+        <div class="summary-row"><span>총 이동 거리</span><span class="summary-value">${formatDistance(totalDist)}</span></div>
+      `;
+    }
+
+    // ============================================
+    // Guide Tab
+    // ============================================
+    let rightMode = APP_DATA.guide ? 'guide' : 'planner';
+
+    function switchRightMode(mode) {
+      rightMode = mode;
+      document.querySelectorAll('.right-mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+      document.getElementById('guideMode').style.display = mode === 'guide' ? 'flex' : 'none';
+      document.getElementById('plannerMode').style.display = mode === 'planner' ? 'flex' : 'none';
+      if (mode === 'planner') render(['travelPlan', 'activeDay']);
+    }
+
+    function renderGuide() {
+      const el = document.getElementById('guideContent');
+      if (!APP_DATA.guide) {
+        el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--color-text-muted)">가이드 데이터가 없습니다</div>';
+        return;
+      }
+      const guide = APP_DATA.guide;
+      let html = '';
+
+      // Sections
+      if (guide.sections) {
+        guide.sections.forEach((section, si) => {
+          const matchingPlaces = section.placeIds.map(id => APP_DATA.places.find(p => p.id === id)).filter(Boolean);
+          html += `<div class="guide-section${si < 3 ? ' open' : ''}" id="guideSection${si}">
+            <div class="guide-section-header" onclick="toggleGuideSection(${si})">
+              <span class="guide-section-icon">${section.icon}</span>
+              <div class="guide-section-info">
+                <div class="guide-section-title">${section.title}</div>
+                <div class="guide-section-desc">${section.description}</div>
+              </div>
+              <span class="guide-section-count">${matchingPlaces.length}곳</span>
+              <span class="guide-section-toggle">▼</span>
+            </div>
+            <div class="guide-section-body">
+              ${section.reason ? `<div class="guide-section-reason">${section.reason}</div>` : ''}`;
+
+          matchingPlaces.forEach(place => {
+            const dist = place.distance >= 1000 ? (place.distance/1000).toFixed(1)+'km' : place.distance+'m';
+            const rating = place.rating ? `⭐ ${place.rating}` : '';
+            const reviews = place.reviewCount ? `(${place.reviewCount})` : '';
+            const evidenceForPlace = (section.evidence || []).filter(e => e.placeId === place.id);
+
+            html += `<div class="guide-place-item" data-id="${place.id}" onclick="selectPlace('${place.id}', 'guide')">
+              <div class="guide-place-name">
+                <span>${place.displayName}</span>
+                <span style="font-size:0.75rem;color:var(--color-primary)">${dist}</span>
+              </div>
+              <div class="guide-place-meta">${rating} ${reviews}${place.priceHint && place.priceHint !== '미확인' ? ' · ' + place.priceHint : ''}</div>`;
+
+            evidenceForPlace.forEach((ev, ei) => {
+              const stars = '★'.repeat(ev.rating) + '☆'.repeat(5 - ev.rating);
+              const displayText = ev.translatedText || ev.text;
+              const hasOriginal = ev.translatedText && ev.text;
+              const origId = `orig_${si}_${place.id}_${ei}`;
+              html += `<div class="guide-evidence">
+                <div class="guide-evidence-text">"${displayText}"</div>
+                ${hasOriginal ? `<div class="guide-evidence-original-toggle" onclick="event.stopPropagation();var el=document.getElementById('${origId}');el.style.display=el.style.display==='none'?'block':'none';this.textContent=el.style.display==='none'?'원문 보기 ▸':'원문 접기 ▾'">원문 보기 ▸</div>
+                <div class="guide-evidence-original" id="${origId}" style="display:none">"${ev.text}"</div>` : ''}
+                <div class="guide-evidence-author">
+                  <span style="color:#D97706">${stars}</span>
+                  <span>— ${ev.author}</span>
+                </div>
+              </div>`;
+            });
+
+            html += `</div>`;
+          });
+
+          html += `</div></div>`;
+        });
+      }
+
+      // Tips
+      if (guide.tips && guide.tips.length > 0) {
+        html += `<div class="guide-tips">
+          <div class="guide-tips-title">💡 실용 팁</div>`;
+        guide.tips.forEach(tip => {
+          html += `<div class="guide-tip-item"><span class="guide-tip-bullet">·</span><span>${tip}</span></div>`;
+        });
+        html += `</div>`;
+      }
+
+      // Warnings
+      if (guide.warnings && guide.warnings.length > 0) {
+        html += `<div class="guide-warnings">
+          <div class="guide-warnings-title">⚠️ 주의사항</div>`;
+        guide.warnings.forEach(w => {
+          html += `<div class="guide-warning-item">
+            <span>⚠️</span>
+            <span><span class="guide-warning-place">${w.placeName}</span>: ${w.text}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      el.innerHTML = html;
+    }
+
+    function toggleGuideSection(index) {
+      const section = document.getElementById('guideSection' + index);
+      if (section) section.classList.toggle('open');
+    }
+
+    // ============================================
+    // Master Render
+    // ============================================
+    function render(changed) {
+      if (!changed || changed.includes('activeCategories') || changed.includes('sortBy')) {
+        renderFilterBar();
+        renderPlaceList();
+        renderMapMarkers();
+      }
+      if (!changed || changed.includes('selectedPlaceId')) {
+        updatePlaceCardHighlights();
+        updateSlotHighlights();
+        updateGuideHighlights();
+      }
+      if (!changed || changed.includes('activeDay') || changed.includes('travelPlan')) {
+        renderDayTabs();
+        renderDayItinerary();
+        renderDayActions();
+        renderTripSummary();
+        MapAdapter.drawItineraryRoute(AppState.activeDay);
+        updateInPlanMarkers();
+      }
+    }
+
+    function updatePlaceCardHighlights() {
+      document.querySelectorAll('.place-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.id === AppState.selectedPlaceId);
+      });
+    }
+
+    function updateSlotHighlights() {
+      document.querySelectorAll('.itinerary-slot').forEach(slot => {
+        slot.classList.toggle('active', slot.dataset.id === AppState.selectedPlaceId);
+      });
+    }
+
+    function updateGuideHighlights() {
+      document.querySelectorAll('.guide-place-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.id === AppState.selectedPlaceId);
+      });
+    }
+
+    function updateInPlanMarkers() {
+      document.querySelectorAll('.place-card').forEach(card => {
+        card.classList.toggle('in-plan', isPlaceInPlan(card.dataset.id));
+      });
+    }
+
+    // ============================================
+    // Interactions
+    // ============================================
+    function selectPlace(placeId, source) {
+      AppState.selectedPlaceId = placeId;
+      const place = getPlaceById(placeId);
+      if (!place) return;
+
+      // Highlight marker
+      MapAdapter.highlightMarker(placeId);
+
+      // Update all panel highlights
+      updatePlaceCardHighlights();
+      updateSlotHighlights();
+      updateGuideHighlights();
+
+      if (source !== 'map') {
+        MapAdapter.panTo(place.lat, place.lng, 16);
+        MapAdapter.openPopup(placeId);
+      }
+
+      if (source !== 'list') {
+        const card = document.querySelector(`.place-card[data-id="${placeId}"]`);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      if (source !== 'itinerary') {
+        const slot = document.querySelector(`.itinerary-slot[data-id="${placeId}"]`);
+        if (slot) slot.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      // Guide panel: scroll to first matching item & open its section
+      if (source !== 'guide') {
+        const guideItem = document.querySelector(`.guide-place-item[data-id="${placeId}"]`);
+        if (guideItem) {
+          // Open the parent section if closed
+          const section = guideItem.closest('.guide-section');
+          if (section && !section.classList.contains('open')) {
+            section.classList.add('open');
+          }
+          guideItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+
+    function toggleCategory(code) {
+      if (AppState.activeCategories.has(code)) {
+        AppState.activeCategories.delete(code);
+      } else {
+        AppState.activeCategories.add(code);
+      }
+      render(['activeCategories']);
+    }
+
+    function changeSortBy(value) {
+      AppState.sortBy = value;
+      render(['sortBy']);
+    }
+
+    // ============================================
+    // Panel Toggle
+    // ============================================
+    function initPanelToggles() {
+      const container = document.getElementById('appContainer');
+      const leftToggle = document.getElementById('leftToggle');
+      const rightToggle = document.getElementById('rightToggle');
+
+      leftToggle.textContent = '◀';
+      rightToggle.textContent = '▶';
+
+      leftToggle.addEventListener('click', () => {
+        AppState.leftPanelOpen = !AppState.leftPanelOpen;
+        container.classList.toggle('left-collapsed', !AppState.leftPanelOpen);
+        leftToggle.textContent = AppState.leftPanelOpen ? '◀' : '▶';
+        MapAdapter.invalidateSize();
+      });
+
+      rightToggle.addEventListener('click', () => {
+        AppState.rightPanelOpen = !AppState.rightPanelOpen;
+        container.classList.toggle('right-collapsed', !AppState.rightPanelOpen);
+        rightToggle.textContent = AppState.rightPanelOpen ? '▶' : '◀';
+        MapAdapter.invalidateSize();
+      });
+    }
+
+    // ============================================
+    // Travel Plan Operations
+    // ============================================
+    function addToPlan(placeId) {
+      const place = getPlaceById(placeId);
+      if (!place || isPlaceInPlan(placeId)) return;
+
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      day.places.push({ ...place });
+      render(['travelPlan']);
+    }
+
+    function removeFromPlan(slotIndex) {
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      const removed = day.places.splice(slotIndex, 1)[0];
+      if (removed) {
+        delete day.notes[removed.id];
+        delete day.timeSlots[removed.id];
+      }
+      render(['travelPlan']);
+    }
+
+    function switchDay(dayNum) {
+      AppState.activeDay = dayNum;
+      render(['activeDay', 'travelPlan']);
+    }
+
+    function addDay() {
+      const num = AppState.travelPlan.days.length + 1;
+      AppState.travelPlan.days.push({ label: `${num}일차`, places: [], notes: {}, timeSlots: {} });
+      AppState.activeDay = num;
+      render(['activeDay', 'travelPlan']);
+    }
+
+    function clearDay() {
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      day.places = [];
+      day.notes = {};
+      day.timeSlots = {};
+      render(['travelPlan']);
+    }
+
+    function updateTimeSlot(placeId, field, value) {
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      if (!day.timeSlots[placeId]) day.timeSlots[placeId] = {};
+      day.timeSlots[placeId][field] = value;
+    }
+
+    function updateNote(placeId, value) {
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      day.notes[placeId] = value;
+    }
+
+    // ============================================
+    // Route Optimization (Nearest Neighbor)
+    // ============================================
+    function optimizeRoute() {
+      const day = AppState.travelPlan.days[AppState.activeDay - 1];
+      if (!day || day.places.length < 2) return;
+
+      const places = [...day.places];
+      const optimized = [places[0]];
+      const remaining = places.slice(1);
+
+      while (remaining.length > 0) {
+        const last = optimized[optimized.length - 1];
+        let nearestIdx = 0;
+        let nearestDist = Infinity;
+
+        remaining.forEach((p, i) => {
+          const d = haversineDistance(last.lat, last.lng, p.lat, p.lng);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestIdx = i;
+          }
+        });
+
+        optimized.push(remaining.splice(nearestIdx, 1)[0]);
+      }
+
+      day.places = optimized;
+      render(['travelPlan']);
+    }
+
+    // ============================================
+    // Drag & Drop: Place Card → Itinerary
+    // ============================================
+    let draggedPlaceId = null;
+    let draggedSlotIndex = null;
+
+    function onPlaceDragStart(e, placeId) {
+      draggedPlaceId = placeId;
+      draggedSlotIndex = null;
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', placeId);
+      e.target.classList.add('dragging');
+    }
+
+    function onSlotDragStart(e, index) {
+      draggedSlotIndex = index;
+      draggedPlaceId = null;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index));
+      e.target.classList.add('dragging');
+    }
+
+    function onSlotDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = draggedPlaceId ? 'copy' : 'move';
+    }
+
+    function onSlotDrop(e, targetIndex) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (draggedSlotIndex !== null && draggedSlotIndex !== targetIndex) {
+        // Reorder within itinerary
+        const day = AppState.travelPlan.days[AppState.activeDay - 1];
+        const [moved] = day.places.splice(draggedSlotIndex, 1);
+        day.places.splice(targetIndex, 0, moved);
+        render(['travelPlan']);
+      }
+      cleanup();
+    }
+
+    // Drop on itinerary container
+    document.getElementById('dayItinerary').addEventListener('dragover', e => {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    });
+    document.getElementById('dayItinerary').addEventListener('dragleave', e => {
+      e.currentTarget.classList.remove('drag-over');
+    });
+    document.getElementById('dayItinerary').addEventListener('drop', e => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+
+      if (draggedPlaceId && !isPlaceInPlan(draggedPlaceId)) {
+        addToPlan(draggedPlaceId);
+      }
+      cleanup();
+    });
+
+    function cleanup() {
+      draggedPlaceId = null;
+      draggedSlotIndex = null;
+      document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+    }
+    document.addEventListener('dragend', cleanup);
+
+    // ============================================
+    // localStorage Save / Load
+    // ============================================
+    const STORAGE_KEY = 'map-search-travel-plans';
+
+    function savePlan() {
+      const data = {
+        savedAt: new Date().toISOString(),
+        query: APP_DATA.query,
+        title: AppState.travelPlan.title || APP_DATA.query,
+        travelPlan: AppState.travelPlan,
+        places: APP_DATA.places
+      };
+      const plans = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      plans.push(data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
+      showToast('여행 계획이 저장되었습니다');
+    }
+
+    function openLoadModal() {
+      const plans = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      const listEl = document.getElementById('savedPlansList');
+
+      if (plans.length === 0) {
+        listEl.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:20px">저장된 계획이 없습니다</p>';
+      } else {
+        listEl.innerHTML = plans.map((plan, i) => `
+          <div class="saved-plan-item" onclick="loadPlan(${i})">
+            <div class="plan-name">${plan.title || plan.query}</div>
+            <div class="plan-date">${new Date(plan.savedAt).toLocaleDateString('ko-KR')} ${new Date(plan.savedAt).toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+        `).join('');
+      }
+      document.getElementById('loadModal').classList.add('visible');
+    }
+
+    function closeLoadModal() {
+      document.getElementById('loadModal').classList.remove('visible');
+    }
+
+    // Close modal on ESC key
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('loadModal');
+        if (modal.classList.contains('visible')) closeLoadModal();
+      }
+    });
+
+    // Close modal on overlay click
+    document.getElementById('loadModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeLoadModal();
+    });
+
+    function loadPlan(index) {
+      const plans = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (plans[index]) {
+        AppState.travelPlan = plans[index].travelPlan;
+        AppState.activeDay = 1;
+        render(['travelPlan', 'activeDay']);
+        closeLoadModal();
+        showToast('여행 계획을 불러왔습니다');
+      }
+    }
+
+    // ============================================
+    // Toast Notification
+    // ============================================
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
+      toast.style.cssText = `
+        position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+        background: var(--color-text); color: white; padding: 12px 24px;
+        border-radius: 999px; font-size: 0.85rem; font-weight: 500; z-index: 3000;
+        box-shadow: var(--shadow-lg); animation: fadeIn 0.3s ease;
+        transition: opacity 0.3s ease;
+      `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+      setTimeout(() => toast.remove(), 2300);
+    }
+
+    // ============================================
+    // Mobile Panel Toggle
+    // ============================================
+    function showMobilePanel(panel) {
+      const left = document.getElementById('leftPanel');
+      const right = document.getElementById('rightPanel');
+      const tabs = document.querySelectorAll('.mobile-bar .tab-btn');
+
+      left.classList.remove('mobile-open');
+      right.classList.remove('mobile-open');
+      tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+
+      if (panel === 'left') {
+        left.classList.add('mobile-open');
+        tabs[0].classList.add('active');
+        tabs[0].setAttribute('aria-selected', 'true');
+      } else if (panel === 'right') {
+        right.classList.add('mobile-open');
+        tabs[2].classList.add('active');
+        tabs[2].setAttribute('aria-selected', 'true');
+      } else {
+        tabs[1].classList.add('active');
+        tabs[1].setAttribute('aria-selected', 'true');
+        MapAdapter.invalidateSize();
+      }
+    }
+
+    // ============================================
+    // Auto-populate dayGroup places
+    // ============================================
+    function autoPopulateDayGroups() {
+      APP_DATA.places.forEach(place => {
+        if (place.dayGroup !== null && place.dayGroup !== undefined) {
+          const dayIdx = place.dayGroup - 1;
+          // Ensure day exists
+          while (AppState.travelPlan.days.length <= dayIdx) {
+            const num = AppState.travelPlan.days.length + 1;
+            AppState.travelPlan.days.push({ label: `${num}일차`, places: [], notes: {}, timeSlots: {} });
+          }
+          // Avoid duplicates
+          const day = AppState.travelPlan.days[dayIdx];
+          if (!day.places.some(p => p.id === place.id)) {
+            day.places.push({ ...place });
+          }
+        }
+      });
+    }
+
+    // ============================================
+    // Search Route Visualization
+    // ============================================
+    // Add a route line to the search route layer (NOT cleared by itinerary)
+    function addSearchRouteLine(coords, options) {
+      var line = L.polyline(coords, {
+        color: options.color || '#F97316',
+        weight: options.weight || 5,
+        opacity: options.opacity || 0.8,
+        dashArray: options.dashed ? '12, 8' : null
+      }).addTo(mapInstance);
+      searchRouteLines.push(line);
+      return line;
+    }
+
+    // Decode Google encoded polyline into [[lat,lng], ...]
+    function decodePolyline(encoded) {
+      var points = [], index = 0, lat = 0, lng = 0;
+      while (index < encoded.length) {
+        var b, shift = 0, result = 0;
+        do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+        shift = 0; result = 0;
+        do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+        points.push([lat / 1e5, lng / 1e5]);
+      }
+      return points;
+    }
+
+    function drawSearchRoute() {
+      var route = APP_DATA.route;
+      var origin = route && route.origin || APP_DATA.searchParams && APP_DATA.searchParams.location;
+      var dest = route && route.destination || APP_DATA.searchParams && APP_DATA.searchParams.destination;
+      if (!origin || !dest) return;
+
+      var hasEncodedPolyline = !!(route && route.polyline);
+      var hasDecodedPoints = !!(route && route.decodedPoints && route.decodedPoints.length > 0);
+      var isRealRoute = hasEncodedPolyline || hasDecodedPoints;
+      var roadCoords, fullCoords;
+
+      if (isRealRoute) {
+        roadCoords = hasEncodedPolyline
+          ? decodePolyline(route.polyline)
+          : route.decodedPoints.map(function(p) { return [p.lat, p.lng]; });
+        // Build full path: origin --(gap?)--> road --> --(gap?)--> destination
+        fullCoords = [];
+        var oriPt = [origin.lat, origin.lng];
+        var firstRoad = roadCoords[0];
+        var lastRoad = roadCoords[roadCoords.length - 1];
+        var destPt = [dest.lat, dest.lng];
+
+        // Origin gap (dashed)
+        if (Math.hypot(oriPt[0] - firstRoad[0], oriPt[1] - firstRoad[1]) > 0.003) {
+          addSearchRouteLine([oriPt, firstRoad], { color: '#F97316', weight: 5, opacity: 0.7, dashed: true });
+        }
+        // Main road route (solid, thick)
+        addSearchRouteLine(roadCoords, { color: '#000', weight: 9, opacity: 0.1, dashed: false });
+        addSearchRouteLine(roadCoords, { color: '#F97316', weight: 6, opacity: 0.9, dashed: false });
+        // Destination gap — ferry/sea crossing (dashed)
+        if (Math.hypot(lastRoad[0] - destPt[0], lastRoad[1] - destPt[1]) > 0.003) {
+          addSearchRouteLine([lastRoad, destPt], { color: '#F97316', weight: 5, opacity: 0.7, dashed: true });
+        }
+        fullCoords = [oriPt].concat(roadCoords).concat([destPt]);
+      } else {
+        // Fallback: origin → sorted places → destination as dashed line
+        var sorted = APP_DATA.places
+          .map(function(p) { return { lat: p.lat, lng: p.lng }; })
+          .sort(function(a, b) {
+            return Math.hypot(a.lat - origin.lat, a.lng - origin.lng)
+                 - Math.hypot(b.lat - origin.lat, b.lng - origin.lng);
+          });
+        fullCoords = [[origin.lat, origin.lng]]
+          .concat(sorted.map(function(p) { return [p.lat, p.lng]; }))
+          .concat([[dest.lat, dest.lng]]);
+        addSearchRouteLine(fullCoords, { color: '#000', weight: 7, opacity: 0.1, dashed: false });
+        addSearchRouteLine(fullCoords, { color: '#F97316', weight: 4, opacity: 0.85, dashed: true });
+      }
+
+      // BIG origin / destination markers
+      addEndpointMarker(origin, '\uCD9C\uBC1C', '#059669', origin.name || '');
+      addEndpointMarker(dest, '\uB3C4\uCC29', '#DC2626', dest.name || '');
+    }
+
+    function addEndpointMarker(point, label, color, name) {
+      var shortName = name.length > 20 ? name.substring(0, 18) + '..' : name;
+      var html = '<div style="display:flex;align-items:center;gap:6px;pointer-events:auto">'
+        + '<div style="background:' + color + ';color:#fff;padding:6px 12px;border-radius:20px;'
+        + 'font-size:13px;font-weight:800;white-space:nowrap;border:3px solid #fff;'
+        + 'box-shadow:0 2px 10px rgba(0,0,0,0.35);letter-spacing:0.5px">'
+        + label + '</div>'
+        + (shortName ? '<div style="background:#fff;color:#333;padding:3px 8px;border-radius:10px;'
+        + 'font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,0.2);'
+        + 'max-width:180px;overflow:hidden;text-overflow:ellipsis">' + shortName + '</div>' : '')
+        + '</div>';
+      var icon = L.divIcon({
+        className: 'endpoint-marker',
+        html: html,
+        iconSize: [200, 36],
+        iconAnchor: [40, 18]
+      });
+      L.marker([point.lat, point.lng], { icon: icon, zIndexOffset: 1000 }).addTo(mapInstance);
+    }
+
+    // ============================================
+    // Init
+    // ============================================
+    function init() {
+      const center = APP_DATA.searchParams.location || { lat: 37.5665, lng: 126.9780 };
+
+      // Init map
+      MapAdapter.init('map', center, CONFIG.defaultZoom);
+
+      // Auto-populate travel plan from dayGroup
+      autoPopulateDayGroups();
+
+      // Set default title
+      if (!AppState.travelPlan.title) {
+        AppState.travelPlan.title = APP_DATA.query;
+      }
+
+      // Render everything
+      renderLeftHeader();
+      renderScenarioBanners();
+      renderLegend();
+
+      // Set up right panel tabs
+      if (APP_DATA.guide) {
+        // Show guide tab first
+        switchRightMode('guide');
+        renderGuide();
+        // Update mobile bar label
+        const mobileRightTab = document.getElementById('mobileRightTab');
+        if (mobileRightTab) mobileRightTab.textContent = '가이드';
+      } else {
+        // No guide data: hide guide tab, show planner directly
+        const rightModeTabs = document.getElementById('rightModeTabs');
+        if (rightModeTabs) rightModeTabs.style.display = 'none';
+        switchRightMode('planner');
+      }
+
+      renderRightHeader();
+      render(['activeCategories', 'sortBy', 'travelPlan', 'activeDay']);
+
+      // Draw search route (origin → places → destination) if route data exists
+      drawSearchRoute();
+
+      // Fit map: include origin/destination if route search
+      const route = APP_DATA.route;
+      if (route?.origin && route?.destination) {
+        const allCoords = [
+          ...APP_DATA.places,
+          { lat: route.origin.lat, lng: route.origin.lng },
+          { lat: route.destination.lat, lng: route.destination.lng }
+        ];
+        MapAdapter.fitBounds(allCoords);
+      } else {
+        MapAdapter.fitBounds(APP_DATA.places);
+      }
+
+      // Panel toggles
+      initPanelToggles();
+
+      // Draw itinerary route for active day
+      MapAdapter.drawItineraryRoute(AppState.activeDay);
+    }
+
+    // Start
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
